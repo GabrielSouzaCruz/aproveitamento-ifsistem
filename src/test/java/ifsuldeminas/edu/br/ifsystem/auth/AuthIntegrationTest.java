@@ -129,6 +129,15 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void cadastroAceitaQualquerDominioDeEmailMasExigeFormatoValido() throws Exception {
+        mvc.perform(postJson("/auth/cadastro",
+                        corpoCadastro(cpfAleatorio(), "t" + UUID.randomUUID().toString().substring(0, 8) + "@gmail.com", SENHA)))
+                .andExpect(status().isCreated());
+        mvc.perform(postJson("/auth/cadastro", corpoCadastro(cpfAleatorio(), "semarroba.com", SENHA)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void cadastroComSenhaCurtaOuCpfInvalidoRetorna400() throws Exception {
         mvc.perform(postJson("/auth/cadastro", corpoCadastro(cpfAleatorio(), email(), "1234567")))
                 .andExpect(status().isBadRequest());

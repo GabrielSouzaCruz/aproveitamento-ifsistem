@@ -21,6 +21,8 @@ import java.util.UUID;
 @Service
 public class UsuarioService {
     static final int SENHA_MINIMA = 8;
+    private static final java.util.regex.Pattern FORMATO_EMAIL =
+            java.util.regex.Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
     private final UsuarioRepository repository;
     private final PasswordEncoder encoder;
@@ -90,8 +92,8 @@ public class UsuarioService {
     }
 
     private void validarEmail(String email) {
-        if (!email.trim().toLowerCase().endsWith("@ifsuldeminas.edu.br"))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email institucional invalido");
+        if (!FORMATO_EMAIL.matcher(email.trim()).matches())
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email invalido");
     }
 
     private boolean isBlank(String value) {
