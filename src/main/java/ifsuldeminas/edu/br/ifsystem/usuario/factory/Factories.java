@@ -13,11 +13,6 @@ abstract class FactoryBase implements UsuarioFactory {
     }
 
     public Usuario criar(CriarUsuario d, String hash) {
-        boolean academico = perfil == Perfil.ALUNO;
-        if (academico && (d.curso() == null || d.curso().isBlank() || d.periodo() == null))
-            throw new IllegalArgumentException("Curso e periodo sao obrigatorios para aluno");
-        if (!academico && (d.curso() != null || d.periodo() != null))
-            throw new IllegalArgumentException("Curso e periodo nao se aplicam a este perfil");
         return new Usuario(d.nome(), d.cpf(), d.email(), d.matricula(), hash, d.telefone(),
                 d.curso(), d.periodo(), perfil);
     }
