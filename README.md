@@ -51,3 +51,43 @@ public class Main {
     }
 }
 ```
+
+## Demo
+
+Roteiro para apresentar a aplicação sem Docker: o profile `demo` usa H2 em arquivo (`./data/demo`) e popula dados de exemplo na primeira execução. Ao reiniciar, os dados continuam lá e o seed não roda de novo. Para começar do zero, apague a pasta `data/`.
+
+1. Subir a aplicação (JDK 21+):
+   ```
+   ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
+   ```
+   No Windows/PowerShell: `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=demo"`
+2. Abrir o Swagger: http://localhost:8080/swagger-ui.html
+3. (Opcional) Console H2: http://localhost:8080/h2-console. JDBC URL `jdbc:h2:file:./data/demo`, usuário `sa`, senha vazia.
+
+A identidade é provisória e vem dos headers `X-Usuario-Id` e `X-Perfil`. Use os usuários abaixo. A senha de todos é `demo123`.
+
+| Perfil | Nome | X-Usuario-Id | Observação |
+|---|---|---|---|
+| `ALUNO` | Ana Aluna Demo | `11111111-1111-1111-1111-111111111111` | curso ADS, dono das 3 solicitações |
+| `SERVIDOR` | Sergio Servidor Demo | `22222222-2222-2222-2222-222222222222` | |
+| `PROFESSOR` | Paula Professora Demo | `33333333-3333-3333-3333-333333333333` | coordenadora do curso ADS |
+
+| Solicitação | ID | Status |
+|---|---|---|
+| Engenharia de Software | `aaaaaaaa-0000-0000-0000-000000000001` | `RASCUNHO` |
+| Banco de Dados | `aaaaaaaa-0000-0000-0000-000000000002` | `ENVIADA`, com parecer da IA |
+| Algoritmos e Lógica de Programação | `aaaaaaaa-0000-0000-0000-000000000003` | `DEFERIDA` |
+
+Exemplos:
+```
+curl -H "X-Usuario-Id: 11111111-1111-1111-1111-111111111111" -H "X-Perfil: ALUNO" http://localhost:8080/aproveitamentos
+curl -H "X-Usuario-Id: 22222222-2222-2222-2222-222222222222" -H "X-Perfil: SERVIDOR" http://localhost:8080/aproveitamentos/aaaaaaaa-0000-0000-0000-000000000002/parecer-ia
+```
+
+### Postgres (opcional)
+
+O profile padrão usa Postgres, configurado por `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` (os defaults são `ifsystem`, `postgres` e `123`). Para usar o `docker-compose.yml`:
+```
+docker compose up -d
+DB_URL=jdbc:postgresql://localhost:5432/aproveitamento DB_USERNAME=aproveitamento DB_PASSWORD=aproveitamento ./mvnw spring-boot:run
+```
