@@ -15,14 +15,15 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.AnexoService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.FluxoStatusService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.ParecerIaService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.SolicitacaoService;
+import ifsuldeminas.edu.br.ifsystem.auth.service.UsuarioAutenticado;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,9 +47,6 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/aproveitamentos")
 public class AproveitamentoController {
-    static final String HEADER_USUARIO_ID = "X-Usuario-Id";
-    static final String HEADER_PERFIL = "X-Perfil";
-
     private final SolicitacaoService solicitacoes;
     private final FluxoStatusService fluxo;
     private final AnexoService anexos;
@@ -63,9 +61,8 @@ public class AproveitamentoController {
     }
 
     @PostMapping
-    public ResponseEntity<SolicitacaoResumo> criar(@Valid @RequestBody CriarSolicitacao dados,
-                                                   HttpServletRequest request) {
-        Usuario usuario = usuarioAtual(request);
+    public ResponseEntity<SolicitacaoResumo> criar(@Valid @RequestBody CriarSolicitacao dados) {
+        Usuario usuario = usuarioAtual();
         if (usuario.perfil() != Perfil.ALUNO)
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Apenas aluno pode criar solicitacao");
         if (!usuario.id().equals(dados.alunoId()))
@@ -77,31 +74,30 @@ public class AproveitamentoController {
     }
 
     @GetMapping("/{id}")
-    public SolicitacaoDetalhe detalhar(@PathVariable UUID id, HttpServletRequest request) {
-        Usuario usuario = usuarioAtual(request);
+    public SolicitacaoDetalhe detalhar(@PathVariable UUID id) {
+        Usuario usuario = usuarioAtual();
         exigirDonoSeAluno(usuario, solicitacoes.buscar(id).getAlunoId());
         return solicitacoes.detalhar(id);
     }
 
     @GetMapping
     public List<SolicitacaoResumo> listar(@RequestParam(required = false) StatusSolicitacao status,
-                                          @RequestParam(required = false) UUID alunoId,
-                                          HttpServletRequest request) {
-        Usuario usuario = usuarioAtual(request);
+                                          @RequestParam(required = false) UUID alunoId) {
+        Usuario usuario = usuarioAtual();
         UUID filtroAluno = usuario.perfil() == Perfil.ALUNO ? usuario.id() : alunoId;
         return solicitacoes.listar(status, filtroAluno);
     }
 
     @GetMapping("/{id}/historico")
-    public List<HistoricoItem> historico(@PathVariable UUID id, HttpServletRequest request) {
-        Usuario usuario = usuarioAtual(request);
+    public List<HistoricoItem> historico(@PathVariable UUID id) {
+        Usuario usuario = usuarioAtual();
         exigirDonoSeAluno(usuario, solicitacoes.buscar(id).getAlunoId());
         return solicitacoes.historico(id);
     }
 
     @GetMapping("/{id}/parecer-ia")
-    public ParecerIaResposta parecerIa(@PathVariable UUID id, HttpServletRequest request) {
-        Usuario usuario = usuarioAtual(request);
+    public ParecerIaResposta parecerIa(@PathVariable UUID id) {
+        Usuario usuario = usuarioAtual();
         if (usuario.perfil() == Perfil.ALUNO)
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Aluno nao acessa o parecer da IA");
         solicitacoes.buscar(id);
@@ -110,8 +106,8 @@ public class AproveitamentoController {
     }
 
     @PostMapping("/{id}/parecer-ia/regerar")
-    public ResponseEntity<Void> regerarParecerIa(@PathVariable UUID id, HttpServletRequest request) {
-        Usuario usuario = usuarioAtual(request);
+    public ResponseEntity<Void> regerarParecerIa(@PathVariable UUID id) {
+        Usuario usuario = usuarioAtual();
         Solicitacao solicitacao = solicitacoes.buscar(id);
         if (!parecerIa.podeRegerar(usuario.id(), usuario.perfil(), solicitacao.getCurso()))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Perfil sem permissao para regerar o parecer");
@@ -121,27 +117,24 @@ public class AproveitamentoController {
 
     @PostMapping("/{id}/{acao}")
     public SolicitacaoResumo executar(@PathVariable UUID id, @PathVariable String acao,
-                                      @Valid @RequestBody(required = false) AcaoRequest corpo,
-                                      HttpServletRequest request) {
-        Usuario usuario = usuarioAtual(request);
+                                      @Valid @RequestBody(required = false) AcaoRequest corpo) {
+        Usuario usuario = usuarioAtual();
         String observacao = corpo == null ? null : corpo.observacao();
         return SolicitacaoResumo.de(fluxo.executar(id, acao, usuario.id(), usuario.perfil(), observacao));
     }
 
     @PostMapping(path = "/{id}/anexos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AnexoResposta> anexar(@PathVariable UUID id,
-                                                @RequestPart("arquivo") MultipartFile arquivo,
-                                                HttpServletRequest request) {
-        exigirAlunoDono(usuarioAtual(request), id);
+                                                @RequestPart("arquivo") MultipartFile arquivo) {
+        exigirAlunoDono(usuarioAtual(), id);
         Anexo anexo = anexos.anexar(id, arquivo);
         return ResponseEntity.created(URI.create("/aproveitamentos/" + id + "/anexos/" + anexo.getId()))
                 .body(AnexoResposta.de(anexo));
     }
 
     @GetMapping("/{id}/anexos/{anexoId}")
-    public ResponseEntity<byte[]> baixarAnexo(@PathVariable UUID id, @PathVariable UUID anexoId,
-                                              HttpServletRequest request) {
-        Usuario usuario = usuarioAtual(request);
+    public ResponseEntity<byte[]> baixarAnexo(@PathVariable UUID id, @PathVariable UUID anexoId) {
+        Usuario usuario = usuarioAtual();
         if (usuario.perfil() == Perfil.ALUNO)
             exigirDonoSeAluno(usuario, solicitacoes.buscar(id).getAlunoId());
         else if (usuario.perfil() != Perfil.SERVIDOR && usuario.perfil() != Perfil.PROFESSOR)
@@ -155,9 +148,8 @@ public class AproveitamentoController {
     }
 
     @DeleteMapping("/{id}/anexos/{anexoId}")
-    public ResponseEntity<Void> removerAnexo(@PathVariable UUID id, @PathVariable UUID anexoId,
-                                             HttpServletRequest request) {
-        exigirAlunoDono(usuarioAtual(request), id);
+    public ResponseEntity<Void> removerAnexo(@PathVariable UUID id, @PathVariable UUID anexoId) {
+        exigirAlunoDono(usuarioAtual(), id);
         anexos.remover(id, anexoId);
         return ResponseEntity.noContent().build();
     }
@@ -187,17 +179,12 @@ public class AproveitamentoController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solicitacao pertence a outro aluno");
     }
 
-    /** Identidade provisoria, lida dos headers ate a autenticacao real existir. */
-    private Usuario usuarioAtual(HttpServletRequest request) {
-        String id = request.getHeader(HEADER_USUARIO_ID);
-        String perfil = request.getHeader(HEADER_PERFIL);
-        if (id == null || perfil == null)
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Identidade ausente");
-        try {
-            return new Usuario(UUID.fromString(id.trim()), Perfil.valueOf(perfil.trim()));
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Identidade invalida");
-        }
+    /** Usuario autenticado, colocado no SecurityContext pelo JwtAuthFilter. */
+    private Usuario usuarioAtual() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UsuarioAutenticado u))
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao necessaria");
+        return new Usuario(u.id(), u.perfil());
     }
 
     private record Usuario(UUID id, Perfil perfil) {

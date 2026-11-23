@@ -1,10 +1,10 @@
 package ifsuldeminas.edu.br.ifsystem.usuario.service;
 
-import ifsuldeminas.edu.br.ifsystem.usuario.api.UsuarioDtos.AtualizarUsuario;
+import ifsuldeminas.edu.br.ifsystem.usuario.api.UsuarioDtos.CriarPorSecretaria;
 import ifsuldeminas.edu.br.ifsystem.usuario.api.UsuarioDtos.CriarUsuario;
 import ifsuldeminas.edu.br.ifsystem.usuario.api.UsuarioDtos.Resposta;
+import ifsuldeminas.edu.br.ifsystem.usuario.domain.Cpf;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
-import ifsuldeminas.edu.br.ifsystem.usuario.domain.StatusUsuario;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Usuario;
 import ifsuldeminas.edu.br.ifsystem.usuario.factory.UsuarioFactory;
 import ifsuldeminas.edu.br.ifsystem.usuario.repository.UsuarioRepository;
@@ -15,14 +15,16 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class UsuarioService {
+    static final int SENHA_MINIMA = 8;
+
     private final UsuarioRepository repository;
     private final PasswordEncoder encoder;
     private final Map<Perfil, UsuarioFactory> factories;
-
 
     public UsuarioService(UsuarioRepository repository, PasswordEncoder encoder,
                           Map<String, UsuarioFactory> factories) {
@@ -34,71 +36,65 @@ public class UsuarioService {
                 Perfil.ADMINISTRADOR, factories.get("administradorFactory"));
     }
 
-    public Usuario buscarPorCpf(String cpf) {
-        return repository.findByCpf(normalizarCpf(cpf))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciais invalidas"));
+    /** Aceita CPF com ou sem mascara. */
+    public Optional<Usuario> buscarPorCpf(String cpf) {
+        return repository.findByCpf(Cpf.normalizar(cpf));
+    }
+
+    /** Usuario existente e ativo; usado pelo filtro JWT a cada requisicao. */
+    public Optional<Usuario> buscarAtivo(UUID id) {
+        return repository.findById(id).filter(Usuario::isAtivo);
     }
 
     public Usuario criar(CriarUsuario d, Perfil perfil) {
         if (d == null || isBlank(d.nome()) || isBlank(d.cpf()) || isBlank(d.email())
                 || isBlank(d.matricula()) || isBlank(d.senha()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dados obrigatorios ausentes");
-
-        if (d.senha().length() < 8)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A senha deve possuir ao menos 8 caracteres");
+        if (d.senha().length() < SENHA_MINIMA)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A senha deve possuir ao menos " + SENHA_MINIMA + " caracteres");
+        if (!Cpf.valido(d.cpf()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CPF invalido");
         validarEmail(d.email());
-        String cpf = normalizarCpf(d.cpf());
-        if (repository.existsByCpf(cpf) || repository.existsByEmail(d.email().toLowerCase())
-                || repository.existsByMatricula(d.matricula()))
+        String cpf = Cpf.normalizar(d.cpf());
+        String email = d.email().trim().toLowerCase();
+        if (repository.existsByCpf(cpf) || repository.existsByEmail(email)
+                || repository.existsByMatricula(d.matricula().trim()))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "CPF, email ou matricula ja cadastrados");
-        CriarUsuario normalizado = new CriarUsuario(d.nome(), cpf, d.email().toLowerCase(),
-                d.matricula(), d.senha(), d.telefone(), d.curso(), d.periodo());
+        CriarUsuario normalizado = new CriarUsuario(d.nome().trim(), cpf, email, d.matricula().trim(),
+                d.senha(), d.telefone(), d.curso(), d.periodo());
         return repository.save(factories.get(perfil).criar(normalizado, encoder.encode(d.senha())));
     }
 
-    public List<Resposta> listar() {
-        return repository.findAll().stream().map(Resposta::de).toList();
-    }
-
-    public Resposta buscar(UUID id) {
-        return Resposta.de(repository.findById(id).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario nao encontrado")));
-    }
-
-    public Resposta atualizar(UUID id, AtualizarUsuario d) {
-        if (d == null || isBlank(d.nome()) || isBlank(d.email()))
+    /** Criacao pela secretaria: PROFESSOR ou SERVIDOR; a matricula e gerada a partir do CPF. */
+    public Usuario criarPorSecretaria(CriarPorSecretaria d) {
+        if (d == null || d.perfil() == null)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dados obrigatorios ausentes");
-        Usuario u = get(id);
-        validarEmail(d.email());
-        u.atualizar(d.nome(), d.email().toLowerCase(),
-                d.telefone(), d.curso(), d.periodo());
+        if (d.perfil() != Perfil.PROFESSOR && d.perfil() != Perfil.SERVIDOR)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Perfil deve ser PROFESSOR ou SERVIDOR");
+        String matricula = d.perfil().name().substring(0, 3) + "-" + Cpf.normalizar(d.cpf());
+        return criar(new CriarUsuario(d.nome(), d.cpf(), d.email(), matricula, d.senha(), null, null, null),
+                d.perfil());
+    }
+
+    public List<Resposta> listar(Perfil perfil) {
+        return (perfil == null ? repository.findAll() : repository.findByPerfil(perfil))
+                .stream().map(Resposta::de).toList();
+    }
+
+    public Resposta alterarAtivo(UUID id, boolean ativo) {
+        Usuario u = repository.findById(id).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario nao encontrado"));
+        u.definirAtivo(ativo);
         return Resposta.de(repository.save(u));
     }
 
-    public void status(UUID id, StatusUsuario status) {
-        get(id).alterarStatus(status);
-        repository.flush();
-    }
-
-    public void excluir(UUID id) {
-        status(id, StatusUsuario.EXCLUIDO);
-    }
-
-    private Usuario get(UUID id) {
-        return repository.findById(id).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario nao encontrado"));
-    }
-
     private void validarEmail(String email) {
-        if (!email.toLowerCase().endsWith("@ifsuldeminas.edu.br"))
+        if (!email.trim().toLowerCase().endsWith("@ifsuldeminas.edu.br"))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email institucional invalido");
     }
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
-    }
-
-    private String normalizarCpf(String cpf) {
-        return cpf.replaceAll("\\D", "");
     }
 }

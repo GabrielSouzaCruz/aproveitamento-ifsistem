@@ -13,8 +13,9 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.AnexoService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.FluxoStatusService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.ParecerIaService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.SolicitacaoService;
-import ifsuldeminas.edu.br.ifsystem.security.JwtService;
-import ifsuldeminas.edu.br.ifsystem.security.SecurityConfig;
+import ifsuldeminas.edu.br.ifsystem.auth.AuthTestSupport;
+import ifsuldeminas.edu.br.ifsystem.auth.config.SecurityConfig;
+import ifsuldeminas.edu.br.ifsystem.auth.service.JwtService;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
 import ifsuldeminas.edu.br.ifsystem.usuario.service.UsuarioService;
 import org.junit.jupiter.api.Test;
@@ -60,7 +61,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AproveitamentoController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, JwtService.class})
 class AproveitamentoControllerTest {
 
     @Autowired
@@ -73,8 +74,8 @@ class AproveitamentoControllerTest {
     private AnexoService anexoService;
     @MockitoBean
     private ParecerIaService parecerIa;
-    // Dependencias do JwtFilter, que o @WebMvcTest registra como filtro.
-    @MockitoBean
+    // JwtService real (gera os tokens dos testes); o filtro JWT consulta o usuario no UsuarioService.
+    @Autowired
     private JwtService jwtService;
     @MockitoBean
     private UsuarioService usuarioService;
@@ -92,8 +93,10 @@ class AproveitamentoControllerTest {
         return s;
     }
 
-    private static <T extends AbstractMockHttpServletRequestBuilder<T>> T como(T req, UUID id, Perfil perfil) {
-        return req.header("X-Usuario-Id", id.toString()).header("X-Perfil", perfil.name());
+    /** Autentica a requisicao como o usuario informado, com um JWT real. */
+    private <T extends AbstractMockHttpServletRequestBuilder<T>> T como(T req, UUID id, Perfil perfil) {
+        when(usuarioService.buscarAtivo(id)).thenReturn(Optional.of(AuthTestSupport.usuario(id, perfil)));
+        return req.header("Authorization", AuthTestSupport.bearer(jwtService, id, perfil));
     }
 
     private String corpoCriar(UUID alunoId) {
@@ -133,7 +136,7 @@ class AproveitamentoControllerTest {
     }
 
     @Test
-    void criarSemHeadersRetorna401() throws Exception {
+    void criarSemTokenRetorna401() throws Exception {
         mvc.perform(postCriar(corpoCriar(aluno)))
                 .andExpect(status().isUnauthorized());
         verifyNoInteractions(solicitacoes);
@@ -147,7 +150,7 @@ class AproveitamentoControllerTest {
     }
 
     @Test
-    void criarComAlunoIdDiferenteDoHeaderRetorna403() throws Exception {
+    void criarComAlunoIdDiferenteDoTokenRetorna403() throws Exception {
         mvc.perform(como(postCriar(corpoCriar(outroAluno)), aluno, Perfil.ALUNO))
                 .andExpect(status().isForbidden());
         verify(solicitacoes, never()).criar(any());
@@ -312,7 +315,7 @@ class AproveitamentoControllerTest {
     }
 
     @Test
-    void acaoSemHeadersRetorna401() throws Exception {
+    void acaoSemTokenRetorna401() throws Exception {
         mvc.perform(postAcao("enviar", null))
                 .andExpect(status().isUnauthorized());
         verifyNoInteractions(fluxo);
@@ -365,7 +368,7 @@ class AproveitamentoControllerTest {
     }
 
     @Test
-    void anexarSemHeadersRetorna401() throws Exception {
+    void anexarSemTokenRetorna401() throws Exception {
         mvc.perform(postAnexo())
                 .andExpect(status().isUnauthorized());
         verifyNoInteractions(anexoService);
@@ -423,7 +426,7 @@ class AproveitamentoControllerTest {
     // GET download
 
     @Test
-    void baixarRetorna200ComHeadersEBytes() throws Exception {
+    void baixarRetorna200ComTokenEBytes() throws Exception {
         Solicitacao s = solicitacao(aluno);
         solicitacaoDoAluno(aluno);
         when(anexoService.baixar(solicitacaoId, anexoId)).thenReturn(new AnexoConteudo(anexo(s), pdfBytes));
@@ -463,7 +466,7 @@ class AproveitamentoControllerTest {
     }
 
     @Test
-    void baixarSemHeadersRetorna401() throws Exception {
+    void baixarSemTokenRetorna401() throws Exception {
         mvc.perform(getAnexo())
                 .andExpect(status().isUnauthorized());
         verifyNoInteractions(anexoService);

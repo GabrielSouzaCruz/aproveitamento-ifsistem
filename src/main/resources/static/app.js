@@ -1,22 +1,17 @@
 'use strict';
 
 /* Tela de demonstracao do fluxo de aproveitamento (padrao visual IF Conect). JS puro, sem build.
- * A identidade e provisoria: o usuario escolhido vai nos headers X-Usuario-Id e X-Perfil. */
+ * Autenticacao: login.html obtem o JWT (POST /auth/login), guardado em sessionStorage e enviado
+ * como Authorization: Bearer. Um 401 devolve para o login. */
 
 const API = '/aproveitamentos';
 
-/** Usuarios fixos do seed do profile demo (DemoSeed). */
-const USUARIOS = [
-    { id: '11111111-1111-1111-1111-111111111111', perfil: 'ALUNO', papel: 'Aluno', area: 'Área do estudante',
-      nome: 'Ana Aluna Demo', primeiroNome: 'Ana', saudacao: 'Bem-vinda de volta, Ana!',
-      descricao: 'Cria, anexa documentos e envia solicitações.' },
-    { id: '22222222-2222-2222-2222-222222222222', perfil: 'SERVIDOR', papel: 'Secretaria', area: 'Área da secretaria',
-      nome: 'Sergio Servidor Demo', primeiroNome: 'Sergio', saudacao: 'Bem-vindo de volta, Sergio!',
-      descricao: 'Confere documentação, devolve pendências e registra.' },
-    { id: '33333333-3333-3333-3333-333333333333', perfil: 'PROFESSOR', papel: 'Coordenador', area: 'Área da coordenação',
-      nome: 'Paula Professora Demo', primeiroNome: 'Paula', saudacao: 'Bem-vinda de volta, professora Paula!',
-      descricao: 'Coordena ADS: analisa, vê o parecer da IA e decide.' }
-];
+/** Rotulos por perfil (o usuario em si vem do login). */
+const PERFIS = {
+    ALUNO: { papel: 'Aluno', area: 'Área do estudante' },
+    SERVIDOR: { papel: 'Secretaria', area: 'Área da secretaria' },
+    PROFESSOR: { papel: 'Coordenador', area: 'Área da coordenação' }
+};
 
 /** Acoes por perfil e status de origem (espelha as classes de transicao do backend). */
 const ACOES = [
@@ -61,20 +56,20 @@ let pollingParecer = null;
 // ---------- Sessao ----------
 
 function usuarioAtual() {
-    const id = sessionStorage.getItem('usuarioId');
-    return USUARIOS.find(u => u.id === id) || null;
+    const token = sessionStorage.getItem('token');
+    let u = null;
+    try { u = JSON.parse(sessionStorage.getItem('usuario')); } catch (e) { /* sessao corrompida */ }
+    if (!token || !u) return null;
+    const exp = Date.parse(sessionStorage.getItem('expiraEm') || '');
+    if (exp && exp < Date.now()) return null;
+    const p = PERFIS[u.perfil] || { papel: u.perfil, area: '' };
+    return Object.assign({}, u, p, { primeiroNome: u.nome.split(' ')[0] });
 }
 
-function entrar(usuario) {
-    sessionStorage.setItem('usuarioId', usuario.id);
-    sessionStorage.setItem('perfil', usuario.perfil);
-    irPara('#/');
-}
-
+/** Limpa a sessao e volta para a tela de login. */
 function sair() {
-    sessionStorage.removeItem('usuarioId');
-    sessionStorage.removeItem('perfil');
-    irPara('#/');
+    ['token', 'usuario', 'expiraEm'].forEach(k => sessionStorage.removeItem(k));
+    location.replace('login.html');
 }
 
 /** Troca de hash dispara o roteamento; se o hash ja for o mesmo, roteia direto. */
@@ -95,7 +90,7 @@ class ErroApi extends Error {
 function mensagemAmigavel(status, acao) {
     switch (status) {
         case 400: return 'Dados inválidos. Confira os campos e tente novamente.';
-        case 401: return 'Sessão inválida. Escolha o usuário novamente.';
+        case 401: return 'Sessão expirada. Entre novamente.';
         case 403: return acao
             ? 'Você não tem permissão para esta ação com o seu perfil.'
             : 'Acesso negado para o seu perfil.';
@@ -110,15 +105,14 @@ function mensagemAmigavel(status, acao) {
 }
 
 async function api(caminho, opcoes = {}) {
-    const u = usuarioAtual();
-    const headers = Object.assign({ 'X-Usuario-Id': u.id, 'X-Perfil': u.perfil }, opcoes.headers || {});
+    const headers = Object.assign({ 'Authorization': 'Bearer ' + sessionStorage.getItem('token') }, opcoes.headers || {});
     if (opcoes.json !== undefined) {
         headers['Content-Type'] = 'application/json';
         opcoes.body = JSON.stringify(opcoes.json);
     }
     const resp = await fetch(API + caminho, { method: opcoes.method || 'GET', headers, body: opcoes.body });
     if (!resp.ok) {
-        if (resp.status === 401) sair();
+        if (resp.status === 401) { sair(); throw new ErroApi(401, mensagemAmigavel(401)); }
         throw new ErroApi(resp.status, mensagemAmigavel(resp.status, opcoes.acao));
     }
     if (opcoes.blob) return resp.blob();
@@ -143,8 +137,9 @@ function statusBadge(status) {
 }
 
 function nomeUsuario(id) {
-    const u = USUARIOS.find(x => x.id === id);
-    return u ? `${u.nome} (${u.papel})` : 'Sistema';
+    if (!id) return 'Sistema';
+    const u = usuarioAtual();
+    return u && u.id === id ? `${u.nome} (${u.papel})` : 'Equipe do IF Sul de Minas';
 }
 
 function iniciais(nome) {
@@ -217,7 +212,7 @@ async function rotear() {
     const detalhe = hash.match(/^\/s\/([0-9a-f-]{36})$/i);
     const nova = hash === '/nova' && u && u.perfil === 'ALUNO';
     montarMoldura(u, nova ? 'nova' : 'lista');
-    if (!u) return telaLogin();
+    if (!u) return sair();
     try {
         if (detalhe) await telaDetalhe(detalhe[1]);
         else if (nova) telaNova();
@@ -245,29 +240,6 @@ window.addEventListener('hashchange', async () => {
 });
 document.getElementById('btn-sair').onclick = sair;
 
-// ---------- Escolha de usuario ----------
-
-function telaLogin() {
-    document.title = 'Aproveitamento de Disciplinas · IF Conect';
-    app.innerHTML = `
-        <section class="login">
-            <img class="logo-completa" src="img/logo-ifconect.png" alt="IF Conect" width="302" height="230">
-            <p class="sobretitulo">Aproveitamento de disciplinas</p>
-            <h1>Quem está acessando?</h1>
-            <p class="muted">Ambiente de demonstração: escolha um dos usuários de exemplo para entrar.</p>
-            <div class="perfis">
-                ${USUARIOS.map((u, i) => `
-                    <button type="button" class="perfil" data-i="${i}">
-                        <span class="avatar">${esc(iniciais(u.nome))}</span>
-                        <span class="contador">${esc(u.papel)}</span>
-                        <strong>${esc(u.nome)}</strong>
-                        <span class="muted">${esc(u.descricao)}</span>
-                    </button>`).join('')}
-            </div>
-        </section>`;
-    app.querySelectorAll('.perfil').forEach(b => b.onclick = () => entrar(USUARIOS[b.dataset.i]));
-}
-
 // ---------- Lista ----------
 
 async function telaLista() {
@@ -285,7 +257,7 @@ async function telaLista() {
     app.innerHTML = `
         <section class="boas-vindas">
             <p class="sobretitulo">${agora.getFullYear()} | ${esc(mes)}</p>
-            <h2>${esc(u.saudacao)}</h2>
+            <h2>Olá, ${esc(u.primeiroNome)}!</h2>
             <p>${aguardando === 0
                 ? 'Nenhuma solicitação aguarda ação sua agora.'
                 : `Você tem ${aguardando} ${aguardando === 1 ? 'solicitação que aguarda' : 'solicitações que aguardam'} ação sua.`}</p>

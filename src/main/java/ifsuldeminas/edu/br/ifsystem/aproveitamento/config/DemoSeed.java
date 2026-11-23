@@ -35,7 +35,10 @@ public class DemoSeed implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(DemoSeed.class);
 
     public static final String CURSO = "ADS";
-    public static final String SENHA = "demo123";
+    public static final String SENHA = "demo1234";
+    public static final String CPF_ALUNO = "52998224725";
+    public static final String CPF_SERVIDOR = "11144477735";
+    public static final String CPF_PROFESSOR = "12345678909";
     public static final UUID ALUNO_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     public static final UUID SERVIDOR_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     public static final UUID PROFESSOR_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
@@ -67,7 +70,12 @@ public class DemoSeed implements CommandLineRunner {
     public void run(String... args) {
         Integer existentes = jdbc.queryForObject("select count(*) from usuarios where id = ?", Integer.class, ALUNO_ID);
         if (existentes != null && existentes > 0) {
-            log.info("Seed demo ignorado: dados de demonstracao ja existem");
+            // Bancos semeados antes do login real: atualiza CPF (valido) e senha dos usuarios demo.
+            String senha = encoder.encode(SENHA);
+            jdbc.update("update usuarios set cpf = ?, senha = ? where id = ?", CPF_ALUNO, senha, ALUNO_ID);
+            jdbc.update("update usuarios set cpf = ?, senha = ? where id = ?", CPF_SERVIDOR, senha, SERVIDOR_ID);
+            jdbc.update("update usuarios set cpf = ?, senha = ? where id = ?", CPF_PROFESSOR, senha, PROFESSOR_ID);
+            log.info("Seed demo ja existe: credenciais demo atualizadas");
             return;
         }
         // Uma transacao so: ou entra tudo, ou nada. Os eventos de envio disparam o parecer apos o commit.
@@ -77,11 +85,11 @@ public class DemoSeed implements CommandLineRunner {
 
     private void popular() {
         String senha = encoder.encode(SENHA);
-        inserirUsuario(ALUNO_ID, "Ana Aluna Demo", "11111111111", "aluno.demo@ifsuldeminas.edu.br",
+        inserirUsuario(ALUNO_ID, "Ana Aluna Demo", CPF_ALUNO, "aluno.demo@ifsuldeminas.edu.br",
                 "DEMO-ALU-001", senha, CURSO, 3, Perfil.ALUNO);
-        inserirUsuario(SERVIDOR_ID, "Sergio Servidor Demo", "22222222222", "servidor.demo@ifsuldeminas.edu.br",
+        inserirUsuario(SERVIDOR_ID, "Sergio Servidor Demo", CPF_SERVIDOR, "servidor.demo@ifsuldeminas.edu.br",
                 "DEMO-SRV-001", senha, null, null, Perfil.SERVIDOR);
-        inserirUsuario(PROFESSOR_ID, "Paula Professora Demo", "33333333333", "professor.demo@ifsuldeminas.edu.br",
+        inserirUsuario(PROFESSOR_ID, "Paula Professora Demo", CPF_PROFESSOR, "professor.demo@ifsuldeminas.edu.br",
                 "DEMO-PRF-001", senha, null, null, Perfil.PROFESSOR);
         coordenadores.save(new Coordenador(PROFESSOR_ID, CURSO));
 

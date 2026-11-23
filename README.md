@@ -64,13 +64,13 @@ Roteiro para apresentar a aplicação sem Docker: o profile `demo` usa H2 em arq
 2. Abrir o Swagger: http://localhost:8080/swagger-ui.html
 3. (Opcional) Console H2: http://localhost:8080/h2-console. JDBC URL `jdbc:h2:file:./data/demo`, usuário `sa`, senha vazia.
 
-A identidade é provisória e vem dos headers `X-Usuario-Id` e `X-Perfil`. Use os usuários abaixo. A senha de todos é `demo123`.
+O login é real: abra http://localhost:8080 e entre com CPF e senha (ou crie uma conta de aluno em "Criar conta"). A senha dos usuários demo é `demo1234` (só nos profiles `demo` e `render`).
 
-| Perfil | Nome | X-Usuario-Id | Observação |
+| Perfil | Nome | CPF | Observação |
 |---|---|---|---|
-| `ALUNO` | Ana Aluna Demo | `11111111-1111-1111-1111-111111111111` | curso ADS, dono das 3 solicitações |
-| `SERVIDOR` | Sergio Servidor Demo | `22222222-2222-2222-2222-222222222222` | |
-| `PROFESSOR` | Paula Professora Demo | `33333333-3333-3333-3333-333333333333` | coordenadora do curso ADS |
+| `ALUNO` | Ana Aluna Demo | `529.982.247-25` | curso ADS, dona das 3 solicitações |
+| `SERVIDOR` | Sergio Servidor Demo | `111.444.777-35` | secretaria |
+| `PROFESSOR` | Paula Professora Demo | `123.456.789-09` | coordenadora do curso ADS |
 
 | Solicitação | ID | Status |
 |---|---|---|
@@ -78,11 +78,17 @@ A identidade é provisória e vem dos headers `X-Usuario-Id` e `X-Perfil`. Use o
 | Banco de Dados | `aaaaaaaa-0000-0000-0000-000000000002` | `ENVIADA`, com parecer da IA |
 | Algoritmos e Lógica de Programação | `aaaaaaaa-0000-0000-0000-000000000003` | `DEFERIDA` |
 
-Exemplos:
+Exemplo via API (o token vai em `Authorization: Bearer`):
 ```
-curl -H "X-Usuario-Id: 11111111-1111-1111-1111-111111111111" -H "X-Perfil: ALUNO" http://localhost:8080/aproveitamentos
-curl -H "X-Usuario-Id: 22222222-2222-2222-2222-222222222222" -H "X-Perfil: SERVIDOR" http://localhost:8080/aproveitamentos/aaaaaaaa-0000-0000-0000-000000000002/parecer-ia
+TOKEN=$(curl -s -X POST localhost:8080/auth/login -H 'Content-Type: application/json'   -d '{"cpf":"52998224725","senha":"demo1234"}' | sed 's/.*"token":"\([^"]*\)".*//')
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/aproveitamentos
 ```
+
+### Autenticação
+
+- `POST /auth/cadastro` (público): cria sempre um ALUNO. `POST /auth/login`: devolve `{token, expiraEm, usuario}`; o token (JWT HS256) vale 8 h.
+- Secretaria (perfil `SERVIDOR`): `POST /usuarios` (PROFESSOR ou SERVIDOR), `GET /usuarios?perfil=`, `PATCH /usuarios/{id}/ativo`.
+- Variáveis: `JWT_SECRET` (obrigatória no profile `render`, mínimo 32 caracteres), `ADMIN_CPF`, `ADMIN_SENHA` e `ADMIN_EMAIL` (opcional). Se não existir nenhum SERVIDOR e `ADMIN_CPF`/`ADMIN_SENHA` estiverem definidos, a conta "Secretaria" é criada na inicialização.
 
 ### Postgres (opcional)
 
@@ -102,5 +108,5 @@ Deploy no Render (Blueprint) usando o profile `render`, com Postgres externo (Su
    DB_USERNAME=postgres.<project-ref>
    DB_PASSWORD=<senha do banco>
    ```
-2. No Render, clique em **New > Blueprint**, selecione este repositório (o `render.yaml` na raiz é lido automaticamente) e preencha as 3 variáveis de ambiente do banco: `DB_URL`, `DB_USERNAME` e `DB_PASSWORD`.
+2. No Render, clique em **New > Blueprint**, selecione este repositório (o `render.yaml` na raiz é lido automaticamente) e preencha as variáveis do banco (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) e da conta inicial da secretaria (`ADMIN_CPF`, `ADMIN_SENHA`, opcional `ADMIN_EMAIL`). `JWT_SECRET` é gerado pelo Blueprint.
 3. Após o build, a aplicação responde em `https://<servico>.onrender.com` (Swagger em `/swagger-ui.html`; health check em `/v3/api-docs`). No plano free o serviço hiberna após inatividade e a primeira requisição é lenta.

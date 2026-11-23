@@ -32,8 +32,9 @@ public class Usuario {
     private String email;
     @Column(nullable = false)
     private String matricula;
-    @Column(nullable = false)
-    private String senha;
+    /** Hash BCrypt. A coluna segue se chamando "senha" para nao quebrar bancos ja criados. */
+    @Column(name = "senha", nullable = false)
+    private String senhaHash;
     private String telefone;
     private String curso;
     private Integer periodo;
@@ -51,13 +52,13 @@ public class Usuario {
     protected Usuario() {
     }
 
-    public Usuario(String nome, String cpf, String email, String matricula, String senha,
+    public Usuario(String nome, String cpf, String email, String matricula, String senhaHash,
                    String telefone, String curso, Integer periodo, Perfil perfil) {
         this.nome = nome;
         this.cpf = cpf;
         this.email = email;
         this.matricula = matricula;
-        this.senha = senha;
+        this.senhaHash = senhaHash;
         this.telefone = telefone;
         this.curso = curso;
         this.periodo = periodo;
@@ -92,8 +93,17 @@ public class Usuario {
         return matricula;
     }
 
-    public String getSenha() {
-        return senha;
+    public String getSenhaHash() {
+        return senhaHash;
+    }
+
+    /** Ativo = pode entrar no sistema (status ATIVO). */
+    public boolean isAtivo() {
+        return status == StatusUsuario.ATIVO;
+    }
+
+    public void definirAtivo(boolean ativo) {
+        this.status = ativo ? StatusUsuario.ATIVO : StatusUsuario.INATIVO;
     }
 
     public String getTelefone() {
@@ -122,10 +132,6 @@ public class Usuario {
         this.telefone = telefone;
         this.curso = curso;
         this.periodo = periodo;
-    }
-
-    public void alterarSenha(String senha) {
-        this.senha = senha;
     }
 
     public void alterarStatus(StatusUsuario status) {
