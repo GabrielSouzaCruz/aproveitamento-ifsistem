@@ -22,7 +22,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * Dados de exemplo para demonstracao (profile "demo").
+ * Dados de exemplo para demonstracao (profiles "demo" e "render").
  * <p>
  * Usuarios e solicitacoes sao inseridos via JDBC para terem UUIDs fixos (as entidades usam
  * {@code @GeneratedValue}); os avancos de status passam pelo {@link FluxoStatusService}, gerando
@@ -30,7 +30,7 @@ import java.util.UUID;
  * Idempotente: se o aluno demo ja existe, nada e feito.
  */
 @Component
-@Profile("demo")
+@Profile({"demo", "render"})
 public class DemoSeed implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(DemoSeed.class);
 

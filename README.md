@@ -91,3 +91,16 @@ O profile padrão usa Postgres, configurado por `DB_URL`, `DB_USERNAME` e `DB_PA
 docker compose up -d
 DB_URL=jdbc:postgresql://localhost:5432/aproveitamento DB_USERNAME=aproveitamento DB_PASSWORD=aproveitamento ./mvnw spring-boot:run
 ```
+
+## Deploy
+
+Deploy no Render (Blueprint) usando o profile `render`, com Postgres externo (Supabase). O profile `render` também executa o seed de demonstração (idempotente) na primeira subida.
+
+1. No Supabase, em **Connect**, copie a string do **Session pooler** (porta `5432`, compatível com IPv4) e converta para o formato JDBC, com `?sslmode=require`:
+   ```
+   DB_URL=jdbc:postgresql://aws-0-<regiao>.pooler.supabase.com:5432/postgres?sslmode=require
+   DB_USERNAME=postgres.<project-ref>
+   DB_PASSWORD=<senha do banco>
+   ```
+2. No Render, clique em **New > Blueprint**, selecione este repositório (o `render.yaml` na raiz é lido automaticamente) e preencha as 3 variáveis de ambiente do banco: `DB_URL`, `DB_USERNAME` e `DB_PASSWORD`.
+3. Após o build, a aplicação responde em `https://<servico>.onrender.com` (Swagger em `/swagger-ui.html`; health check em `/v3/api-docs`). No plano free o serviço hiberna após inatividade e a primeira requisição é lenta.
