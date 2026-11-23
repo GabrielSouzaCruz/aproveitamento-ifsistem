@@ -133,3 +133,27 @@ O schema do Postgres (profiles padrão e `render`) é versionado com Flyway em `
 **Daqui pra frente, toda mudança de entidade (coluna, tabela, constraint, índice) exige uma nova migração `V{n}__descricao.sql`** (ex.: `V2__add_coluna_x.sql`). Nunca edite uma migração já aplicada. Sem a migração, a aplicação não sobe (falha na validação).
 
 O profile `demo` (H2) e os testes usam `ddl-auto=create-drop` com o Flyway desligado, pois o SQL das migrações é específico do Postgres.
+
+## Parecer de equivalência por IA (Gemini)
+
+O parecer de cada solicitação enviada é gerado de forma assíncrona. Por padrão usa a heurística local
+(`heuristica-local-v1`); com o Gemini ativado, ela vira reserva automática.
+
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `IA_PROVEDOR` | `fake` | `fake` (heurística local) ou `gemini` |
+| `GEMINI_API_KEY` | — | Obrigatória com `IA_PROVEDOR=gemini` (sem ela a aplicação não sobe) |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Modelo Flash disponível no free tier |
+
+**Gerar a chave:** acesse https://aistudio.google.com/apikey, entre com a conta Google, clique em
+*Create API key* e copie o valor. Nunca versione a chave; defina-a só como variável de ambiente.
+
+```
+IA_PROVEDOR=gemini GEMINI_API_KEY=<sua-chave> ./mvnw spring-boot:run
+```
+
+Comportamento: chamada REST `POST /v1beta/models/{modelo}:generateContent` (chave no header
+`x-goog-api-key`, temperature 0.2, saída JSON com schema), timeout de 30s e 1 retry em 429/5xx. Se ainda
+falhar, ou se o JSON vier inválido, usa a heurística local e grava o modelo como
+`heuristica-local-v1 (fallback: <motivo>)`. A chave e o conteúdo das ementas nunca são logados.
+`ParecerIa.modelo` guarda o modelo do Gemini efetivamente usado. A antiga `ifconnect.analisador` foi removida.

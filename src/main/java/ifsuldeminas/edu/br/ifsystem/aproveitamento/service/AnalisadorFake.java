@@ -1,7 +1,6 @@
 package ifsuldeminas.edu.br.ifsystem.aproveitamento.service;
 
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.RecomendacaoIa;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.text.Normalizer;
@@ -10,11 +9,10 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Analisador deterministico, usado enquanto nao ha integracao real com a IA: compara as ementas por
+ * Analisador deterministico (provedor fake e reserva do Gemini): compara as ementas por
  * sobreposicao de palavras (indice de Jaccard, 0-100) e considera a diferenca de carga horaria.
  */
 @Component
-@ConditionalOnProperty(name = "ifconnect.analisador", havingValue = "fake", matchIfMissing = true)
 public class AnalisadorFake implements AnalisadorEquivalencia {
 
     static final String MODELO = "heuristica-local-v1";
