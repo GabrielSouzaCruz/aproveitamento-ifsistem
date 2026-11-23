@@ -1,4 +1,22 @@
 /* Segue o Guia visual do IF Conect: paleta, tipografia (Montserrat + Inter) e layout com menu lateral. */
+
+/* Fontes locais (fonts/, licenca SIL OFL 1.1), subconjunto latin, que cobre o portugues. Sao fontes
+ * variaveis: um arquivo atende todos os pesos usados. */
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400 600;
+    font-display: swap;
+    src: url("fonts/inter-latin.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Montserrat";
+    font-style: normal;
+    font-weight: 600 800;
+    font-display: swap;
+    src: url("fonts/montserrat-latin.woff2") format("woff2");
+}
+
 :root {
     /* Marca */
     --verde-floresta: #14532D;  /* menu lateral, cabecalhos e titulos */
@@ -59,8 +77,15 @@ a { color: var(--verde-acao); }
     padding: 1.5rem 1rem 1rem;
     background: var(--verde-floresta); color: #fff;
 }
-.marca { font-family: var(--fonte-titulo); font-weight: 800; font-size: 26px; padding: 0 .5rem; color: #fff; }
-.marca span { color: var(--verde-vivo); }
+.marca {
+    display: flex; align-items: center; gap: .65rem; padding: 0 .5rem;
+    font-family: var(--fonte-titulo); font-weight: 800; font-size: 24px; color: #fff; text-decoration: none;
+}
+.marca span span { color: var(--verde-vivo); }
+/* O simbolo tem verde escuro que some no menu: fica num selo branco, como no guia. */
+.selo-logo { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px; background: #fff; }
+.selo-logo img { display: block; width: 32px; height: 32px; }
+.logo-completa { display: block; width: 180px; height: auto; margin: 0 auto 1.5rem; }
 .area { margin: 2rem .5rem .6rem; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.7); }
 
 .menu { display: flex; flex-direction: column; gap: .25rem; }
@@ -114,6 +139,7 @@ a { color: var(--verde-acao); }
 
 /* Sem sessao: so a tela de escolha de usuario, sem menu */
 body.sem-sessao .lateral, body.sem-sessao .barra-topo { display: none; }
+body.sem-sessao .conteudo { margin: 0 auto; }
 
 /* Celular: o menu lateral vira faixa no topo */
 @media (max-width: 860px) {
@@ -194,7 +220,6 @@ dl.dados dd { margin: 0; font-weight: 500; }
 
 /* ---------- Escolha de usuario ---------- */
 .login { max-width: 860px; margin: 3rem auto; text-align: center; }
-.login .marca { color: var(--verde-floresta); font-size: 40px; margin-bottom: 1rem; }
 .login h1 { font-size: 32px; }
 .perfis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-top: 2rem; text-align: left; }
 .perfil {

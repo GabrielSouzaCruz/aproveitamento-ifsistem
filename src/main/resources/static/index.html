@@ -4,16 +4,19 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Aproveitamento de Disciplinas · IF Conect</title>
-    <!-- Fontes do guia visual IF Conect; sem rede, cai nas fontes do sistema. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@600;700;800&display=swap">
+    <link rel="icon" type="image/png" href="img/favicon.png">
+    <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+    <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/montserrat-latin.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="sem-sessao">
 <div class="layout">
     <aside class="lateral" id="lateral">
-        <div class="marca">IF <span>Conect</span></div>
+        <a class="marca" href="#/">
+            <span class="selo-logo"><img src="img/logo-simbolo.png" alt="" width="32" height="32"></span>
+            <span>IF <span>Conect</span></span>
+        </a>
         <p class="area" id="area-usuario"></p>
         <nav class="menu" id="menu"></nav>
         <div class="ajuda">
