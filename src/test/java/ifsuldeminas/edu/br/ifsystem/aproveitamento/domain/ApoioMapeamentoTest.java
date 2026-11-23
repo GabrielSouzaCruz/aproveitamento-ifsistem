@@ -105,18 +105,20 @@ class ApoioMapeamentoTest {
     @Test
     void persisteCoordenadorEImpedeDuplicidadeProfessorCurso() {
         UUID professor = UUID.randomUUID();
-        Coordenador c = tem.persist(new Coordenador(professor, "ADS"));
-        tem.persist(new Coordenador(professor, "Agronomia"));
-        tem.persist(new Coordenador(UUID.randomUUID(), "ADS"));
+        Curso ads = tem.persist(new Curso("ADS", "Analise e Desenvolvimento de Sistemas"));
+        Curso agro = tem.persist(new Curso("AGR", "Agronomia"));
+        Coordenador c = tem.persist(new Coordenador(professor, ads));
+        tem.persist(new Coordenador(professor, agro));
+        tem.persist(new Coordenador(UUID.randomUUID(), ads));
         tem.flush();
         tem.clear();
 
         Coordenador carregado = tem.find(Coordenador.class, c.getId());
         assertThat(carregado.getProfessorId()).isEqualTo(professor);
-        assertThat(carregado.getCurso()).isEqualTo("ADS");
+        assertThat(carregado.getCurso().getId()).isEqualTo(ads.getId());
 
         assertThatThrownBy(() -> {
-            em.persist(new Coordenador(professor, "ADS"));
+            em.persist(new Coordenador(professor, ads));
             em.flush();
         }).isInstanceOf(PersistenceException.class)
                 .hasStackTraceContaining("UK_COORDENADOR_PROFESSOR_CURSO");

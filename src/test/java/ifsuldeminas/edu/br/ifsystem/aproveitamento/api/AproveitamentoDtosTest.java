@@ -73,14 +73,14 @@ class AproveitamentoDtosTest {
     @Test
     void disciplinaAnexoEHistoricoDe() {
         Solicitacao s = solicitacao();
-        DisciplinaCursada d = comId(new DisciplinaCursada(s, "BD I", "UFLA", 40));
+        DisciplinaCursada d = comId(new DisciplinaCursada(s, "BD I", "UFLA", 40, "modelagem sql"));
         Anexo a = comId(new Anexo(s, "historico.pdf", "application/pdf", 1234L));
         UUID responsavel = UUID.randomUUID();
         HistoricoStatus h = comId(new HistoricoStatus(s, StatusSolicitacao.RASCUNHO,
                 StatusSolicitacao.ENVIADA, responsavel, "Enviada"));
 
         assertThat(DisciplinaCursadaResposta.de(d))
-                .isEqualTo(new DisciplinaCursadaResposta(d.getId(), "BD I", "UFLA", 40));
+                .isEqualTo(new DisciplinaCursadaResposta(d.getId(), "BD I", "UFLA", 40, "modelagem sql"));
         assertThat(AnexoResposta.de(a))
                 .isEqualTo(new AnexoResposta(a.getId(), "historico.pdf", 1234L, a.getCriadoEm()));
         assertThat(HistoricoItem.de(h)).isEqualTo(new HistoricoItem(StatusSolicitacao.RASCUNHO,
@@ -102,7 +102,7 @@ class AproveitamentoDtosTest {
     @Test
     void solicitacaoDetalheDeComPreDiagnostico() {
         Solicitacao s = solicitacao();
-        DisciplinaCursada d = comId(new DisciplinaCursada(s, "BD I", "UFLA", 40));
+        DisciplinaCursada d = comId(new DisciplinaCursada(s, "BD I", "UFLA", 40, "modelagem sql"));
         Anexo a = comId(new Anexo(s, "historico.pdf", "application/pdf", 10L));
         PreDiagnostico p = comId(new PreDiagnostico(s, StatusPreDiagnostico.FALHA,
                 new BigDecimal("40.00"), null, "Carga abaixo", "p", "m"));
@@ -142,28 +142,28 @@ class AproveitamentoDtosTest {
 
     @Test
     void criarSolicitacaoValidaNaoGeraViolacoes() {
-        CriarSolicitacao ok = new CriarSolicitacao(UUID.randomUUID(), "ADS", "Banco de Dados", 60,
-                List.of(new DisciplinaCursadaEntrada("BD I", "UFLA", 40)));
+        CriarSolicitacao ok = new CriarSolicitacao(UUID.randomUUID(), UUID.randomUUID(),
+                List.of(new DisciplinaCursadaEntrada("BD I", "UFLA", 40, "modelagem sql")));
         assertThat(validator.validate(ok)).isEmpty();
     }
 
     @Test
     void criarSolicitacaoInvalidaGeraViolacoes() {
-        CriarSolicitacao vazia = new CriarSolicitacao(null, " ", "", 0, List.of());
-        assertThat(camposInvalidos(vazia)).containsExactlyInAnyOrder(
-                "alunoId", "curso", "disciplinaDestino", "cargaHorariaDestino", "disciplinas");
+        CriarSolicitacao vazia = new CriarSolicitacao(null, null, List.of());
+        assertThat(camposInvalidos(vazia)).containsExactlyInAnyOrder("alunoId", "disciplinaDestinoId", "disciplinas");
 
-        CriarSolicitacao semLista = new CriarSolicitacao(UUID.randomUUID(), "ADS", "BD", -5, null);
-        assertThat(camposInvalidos(semLista)).containsExactlyInAnyOrder("cargaHorariaDestino", "disciplinas");
+        CriarSolicitacao semLista = new CriarSolicitacao(UUID.randomUUID(), UUID.randomUUID(), null);
+        assertThat(camposInvalidos(semLista)).containsExactlyInAnyOrder("disciplinas");
     }
 
     @Test
     void criarSolicitacaoValidaDisciplinasAninhadas() {
-        CriarSolicitacao dto = new CriarSolicitacao(UUID.randomUUID(), "ADS", "BD", 60,
-                List.of(new DisciplinaCursadaEntrada("BD I", "UFLA", 40),
-                        new DisciplinaCursadaEntrada("", null, -1)));
+        CriarSolicitacao dto = new CriarSolicitacao(UUID.randomUUID(), UUID.randomUUID(),
+                List.of(new DisciplinaCursadaEntrada("BD I", "UFLA", 40, "modelagem sql"),
+                        new DisciplinaCursadaEntrada("", null, -1, " ")));
         assertThat(camposInvalidos(dto)).containsExactlyInAnyOrder(
-                "disciplinas[1].nome", "disciplinas[1].instituicao", "disciplinas[1].cargaHoraria");
+                "disciplinas[1].nome", "disciplinas[1].instituicao", "disciplinas[1].cargaHoraria",
+                "disciplinas[1].ementa");
     }
 
     @Test

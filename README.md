@@ -70,7 +70,7 @@ O login é real: abra http://localhost:8080 e entre com CPF e senha (ou crie uma
 |---|---|---|---|
 | `ALUNO` | Ana Aluna Demo | `529.982.247-25` | curso ADS, dona das 3 solicitações |
 | `SERVIDOR` | Sergio Servidor Demo | `111.444.777-35` | secretaria |
-| `PROFESSOR` | Paula Professora Demo | `123.456.789-09` | coordenadora do curso ADS |
+| `PROFESSOR` | Paula Professora Demo | `123.456.789-09` | coordenadora do curso TADS (catálogo com 4 disciplinas e ementas) |
 
 | Solicitação | ID | Status |
 |---|---|---|

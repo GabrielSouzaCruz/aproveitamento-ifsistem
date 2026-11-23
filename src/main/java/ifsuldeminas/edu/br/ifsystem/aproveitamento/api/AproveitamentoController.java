@@ -108,8 +108,8 @@ public class AproveitamentoController {
     @PostMapping("/{id}/parecer-ia/regerar")
     public ResponseEntity<Void> regerarParecerIa(@PathVariable UUID id) {
         Usuario usuario = usuarioAtual();
-        Solicitacao solicitacao = solicitacoes.buscar(id);
-        if (!parecerIa.podeRegerar(usuario.id(), usuario.perfil(), solicitacao.getCurso()))
+        solicitacoes.buscar(id);
+        if (!parecerIa.podeRegerar(usuario.id(), usuario.perfil(), id))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Perfil sem permissao para regerar o parecer");
         parecerIa.regerar(id);
         return ResponseEntity.accepted().build();

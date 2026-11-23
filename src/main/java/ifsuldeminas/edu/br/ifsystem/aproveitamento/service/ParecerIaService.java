@@ -1,10 +1,10 @@
 package ifsuldeminas.edu.br.ifsystem.aproveitamento.service;
 
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.DisciplinaCursada;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.DisciplinaCurso;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.ParecerIa;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Solicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusParecerIa;
-import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.CoordenadorRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.DisciplinaCursadaRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.ParecerIaRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.SolicitacaoRepository;
@@ -33,11 +33,11 @@ public class ParecerIaService {
     private final SolicitacaoRepository solicitacoes;
     private final DisciplinaCursadaRepository disciplinas;
     private final AnalisadorEquivalencia analisador;
-    private final CoordenadorRepository coordenadores;
+    private final CatalogoService coordenadores;
 
     public ParecerIaService(ParecerIaRepository pareceres, SolicitacaoRepository solicitacoes,
                             DisciplinaCursadaRepository disciplinas, AnalisadorEquivalencia analisador,
-                            CoordenadorRepository coordenadores) {
+                            CatalogoService coordenadores) {
         this.pareceres = pareceres;
         this.solicitacoes = solicitacoes;
         this.disciplinas = disciplinas;
@@ -59,9 +59,11 @@ public class ParecerIaService {
 
     /** Regeracao liberada para SERVIDOR e para o professor que coordena o curso da solicitacao. */
     @Transactional(readOnly = true)
-    public boolean podeRegerar(UUID usuarioId, Perfil perfil, String curso) {
-        return perfil == Perfil.SERVIDOR
-                || (perfil == Perfil.PROFESSOR && coordenadores.existsByProfessorIdAndCurso(usuarioId, curso));
+    public boolean podeRegerar(UUID usuarioId, Perfil perfil, UUID solicitacaoId) {
+        if (perfil == Perfil.SERVIDOR)
+            return true;
+        return perfil == Perfil.PROFESSOR && solicitacoes.findById(solicitacaoId)
+                .map(s -> coordenadores.coordena(usuarioId, s)).orElse(false);
     }
 
     @Transactional(readOnly = true)
@@ -106,12 +108,15 @@ public class ParecerIaService {
         return texto.length() > LIMITE_ERRO ? texto.substring(0, LIMITE_ERRO) : texto;
     }
 
-    /** Ementas seguem nulas nesta fase: ainda nao ha campo de ementa na solicitacao. */
+    /** Ementa de origem vem da disciplina cursada; a de destino, do catalogo (nula em solicitacoes antigas). */
     private EntradaAnalise montarEntrada(Solicitacao solicitacao) {
         List<DisciplinaCursada> cursadas = disciplinas.findBySolicitacaoId(solicitacao.getId());
         DisciplinaCursada origem = cursadas.isEmpty() ? null : cursadas.get(0);
+        DisciplinaCurso destino = solicitacao.getDisciplinaCursoDestino();
         return new EntradaAnalise(
-                origem == null ? null : origem.getNome(), null, origem == null ? null : origem.getCargaHoraria(),
-                solicitacao.getDisciplinaDestino(), null, solicitacao.getCargaHorariaDestino());
+                origem == null ? null : origem.getNome(), origem == null ? null : origem.getEmenta(),
+                origem == null ? null : origem.getCargaHoraria(),
+                solicitacao.getDisciplinaDestino(), destino == null ? null : destino.getEmenta(),
+                solicitacao.getCargaHorariaDestino());
     }
 }

@@ -6,7 +6,9 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.Histor
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.SolicitacaoDetalhe;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.SolicitacaoResumo;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.DisciplinaCursada;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.DisciplinaCurso;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.HistoricoStatus;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.DisciplinaCursoRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Solicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusSolicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.AnexoRepository;
@@ -30,10 +32,12 @@ public class SolicitacaoService {
     private final AnexoRepository anexos;
     private final PreDiagnosticoRepository preDiagnosticos;
     private final HistoricoStatusRepository historicos;
+    private final DisciplinaCursoRepository catalogo;
 
     public SolicitacaoService(SolicitacaoRepository solicitacoes, DisciplinaCursadaRepository disciplinas,
                               AnexoRepository anexos, PreDiagnosticoRepository preDiagnosticos,
-                              HistoricoStatusRepository historicos) {
+                              HistoricoStatusRepository historicos, DisciplinaCursoRepository catalogo) {
+        this.catalogo = catalogo;
         this.solicitacoes = solicitacoes;
         this.disciplinas = disciplinas;
         this.anexos = anexos;
@@ -43,10 +47,15 @@ public class SolicitacaoService {
 
     @Transactional
     public Solicitacao criar(CriarSolicitacao d) {
-        Solicitacao solicitacao = solicitacoes.save(new Solicitacao(
-                d.alunoId(), d.curso(), d.disciplinaDestino(), d.cargaHorariaDestino()));
+        DisciplinaCurso destino = catalogo.findById(d.disciplinaDestinoId())
+                .filter(x -> x.isAtivo() && x.getCurso().isAtivo())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "disciplinaDestinoId inexistente ou inativa"));
+        // Texto (nome, curso, carga horaria) copiado do catalogo: preserva o historico se o catalogo mudar.
+        Solicitacao solicitacao = solicitacoes.save(new Solicitacao(d.alunoId(), destino));
         for (DisciplinaCursadaEntrada e : d.disciplinas()) {
-            disciplinas.save(new DisciplinaCursada(solicitacao, e.nome(), e.instituicao(), e.cargaHoraria()));
+            disciplinas.save(new DisciplinaCursada(solicitacao, e.nome(), e.instituicao(), e.cargaHoraria(),
+                    e.ementa()));
         }
         historicos.save(new HistoricoStatus(solicitacao, null, StatusSolicitacao.RASCUNHO, d.alunoId(), null));
         return solicitacao;

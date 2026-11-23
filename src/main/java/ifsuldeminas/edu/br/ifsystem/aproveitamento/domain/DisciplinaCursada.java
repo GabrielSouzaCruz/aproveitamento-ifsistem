@@ -27,15 +27,20 @@ public class DisciplinaCursada {
     private String instituicao;
     @Column(nullable = false)
     private Integer cargaHoraria;
+    /** Obrigatoria em solicitacoes novas; nula nos registros anteriores ao catalogo. */
+    @Column(columnDefinition = "text")
+    private String ementa;
 
     protected DisciplinaCursada() {
     }
 
-    public DisciplinaCursada(Solicitacao solicitacao, String nome, String instituicao, Integer cargaHoraria) {
+    public DisciplinaCursada(Solicitacao solicitacao, String nome, String instituicao, Integer cargaHoraria,
+                             String ementa) {
         this.solicitacao = solicitacao;
         this.nome = nome;
         this.instituicao = instituicao;
         this.cargaHoraria = cargaHoraria;
+        this.ementa = ementa;
     }
 
     public UUID getId() {
@@ -56,5 +61,9 @@ public class DisciplinaCursada {
 
     public Integer getCargaHoraria() {
         return cargaHoraria;
+    }
+
+    public String getEmenta() {
+        return ementa;
     }
 }

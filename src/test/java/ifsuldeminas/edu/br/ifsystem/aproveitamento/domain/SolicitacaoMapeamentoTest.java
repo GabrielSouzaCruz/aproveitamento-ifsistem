@@ -27,8 +27,8 @@ class SolicitacaoMapeamentoTest {
     void persisteSolicitacaoComDuasDisciplinasCursadas() {
         UUID alunoId = UUID.randomUUID();
         Solicitacao solicitacao = tem.persist(new Solicitacao(alunoId, "ADS", "Banco de Dados", 60));
-        DisciplinaCursada d1 = tem.persist(new DisciplinaCursada(solicitacao, "Modelagem de Dados", "UFLA", 40));
-        DisciplinaCursada d2 = tem.persist(new DisciplinaCursada(solicitacao, "SQL Avançado", "UNIFAL", 30));
+        DisciplinaCursada d1 = tem.persist(new DisciplinaCursada(solicitacao, "Modelagem de Dados", "UFLA", 40, "ementa de teste"));
+        DisciplinaCursada d2 = tem.persist(new DisciplinaCursada(solicitacao, "SQL Avançado", "UNIFAL", 30, "ementa de teste"));
         tem.flush();
         tem.clear();
 
