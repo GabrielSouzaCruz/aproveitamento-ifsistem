@@ -4,9 +4,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
@@ -28,6 +31,10 @@ public class Solicitacao {
     private String disciplinaDestino;
     @Column(nullable = false)
     private Integer cargaHorariaDestino;
+    /** Disciplina do catalogo; nula nas solicitacoes anteriores ao catalogo (os textos acima ficam como historico). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "disciplina_destino_id")
+    private DisciplinaCurso disciplinaCursoDestino;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StatusSolicitacao status;
@@ -49,6 +56,12 @@ public class Solicitacao {
         this.status = StatusSolicitacao.RASCUNHO;
         this.criadoEm = OffsetDateTime.now();
         this.atualizadoEm = this.criadoEm;
+    }
+
+    /** Copia nome, curso e carga horaria da disciplina do catalogo para os campos de texto. */
+    public Solicitacao(UUID alunoId, DisciplinaCurso destino) {
+        this(alunoId, destino.getCurso().getNome(), destino.getNome(), destino.getCargaHoraria());
+        this.disciplinaCursoDestino = destino;
     }
 
     @PreUpdate
@@ -74,6 +87,10 @@ public class Solicitacao {
 
     public Integer getCargaHorariaDestino() {
         return cargaHorariaDestino;
+    }
+
+    public DisciplinaCurso getDisciplinaCursoDestino() {
+        return disciplinaCursoDestino;
     }
 
     public StatusSolicitacao getStatus() {

@@ -86,9 +86,9 @@ class AproveitamentoRepositoryTest {
     void disciplinaCursadaFindBySolicitacaoId() {
         Solicitacao s = novaSolicitacao(UUID.randomUUID());
         Solicitacao outra = novaSolicitacao(UUID.randomUUID());
-        DisciplinaCursada d1 = tem.persist(new DisciplinaCursada(s, "BD I", "UFLA", 40));
-        DisciplinaCursada d2 = tem.persist(new DisciplinaCursada(s, "BD II", "UFLA", 30));
-        tem.persist(new DisciplinaCursada(outra, "Calculo", "UFMG", 60));
+        DisciplinaCursada d1 = tem.persist(new DisciplinaCursada(s, "BD I", "UFLA", 40, "ementa de teste"));
+        DisciplinaCursada d2 = tem.persist(new DisciplinaCursada(s, "BD II", "UFLA", 30, "ementa de teste"));
+        tem.persist(new DisciplinaCursada(outra, "Calculo", "UFMG", 60, "ementa de teste"));
         sincronizar();
 
         assertThat(disciplinas.findBySolicitacaoId(s.getId()))

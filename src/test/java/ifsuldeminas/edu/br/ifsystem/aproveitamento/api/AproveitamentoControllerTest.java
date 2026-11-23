@@ -101,9 +101,9 @@ class AproveitamentoControllerTest {
 
     private String corpoCriar(UUID alunoId) {
         return """
-                {"alunoId":"%s","curso":"ADS","disciplinaDestino":"Banco de Dados","cargaHorariaDestino":60,
-                 "disciplinas":[{"nome":"BD I","instituicao":"UFLA","cargaHoraria":40}]}
-                """.formatted(alunoId);
+                {"alunoId":"%s","disciplinaDestinoId":"%s",
+                 "disciplinas":[{"nome":"BD I","instituicao":"UFLA","cargaHoraria":40,"ementa":"modelagem sql"}]}
+                """.formatted(alunoId, UUID.randomUUID());
     }
 
     private MockHttpServletRequestBuilder postCriar(String corpo) {
@@ -127,7 +127,7 @@ class AproveitamentoControllerTest {
     @Test
     void criarComBodyInvalidoRetorna400() throws Exception {
         String invalido = """
-                {"alunoId":"%s","curso":"","disciplinaDestino":"BD","cargaHorariaDestino":0,"disciplinas":[]}
+                {"alunoId":"%s","disciplinas":[]}
                 """.formatted(aluno);
 
         mvc.perform(como(postCriar(invalido), aluno, Perfil.ALUNO))
@@ -557,7 +557,7 @@ class AproveitamentoControllerTest {
     @Test
     void regerarParecerIaRetorna202QuandoPermitido() throws Exception {
         when(solicitacoes.buscar(solicitacaoId)).thenReturn(solicitacao(aluno));
-        when(parecerIa.podeRegerar(servidor, Perfil.SERVIDOR, "ADS")).thenReturn(true);
+        when(parecerIa.podeRegerar(servidor, Perfil.SERVIDOR, solicitacaoId)).thenReturn(true);
 
         mvc.perform(como(post("/aproveitamentos/{id}/parecer-ia/regerar", solicitacaoId), servidor, Perfil.SERVIDOR))
                 .andExpect(status().isAccepted());
@@ -567,7 +567,7 @@ class AproveitamentoControllerTest {
     @Test
     void regerarParecerIaRetorna403SemPermissao() throws Exception {
         when(solicitacoes.buscar(solicitacaoId)).thenReturn(solicitacao(aluno));
-        when(parecerIa.podeRegerar(aluno, Perfil.ALUNO, "ADS")).thenReturn(false);
+        when(parecerIa.podeRegerar(aluno, Perfil.ALUNO, solicitacaoId)).thenReturn(false);
 
         mvc.perform(como(post("/aproveitamentos/{id}/parecer-ia/regerar", solicitacaoId), aluno, Perfil.ALUNO))
                 .andExpect(status().isForbidden());

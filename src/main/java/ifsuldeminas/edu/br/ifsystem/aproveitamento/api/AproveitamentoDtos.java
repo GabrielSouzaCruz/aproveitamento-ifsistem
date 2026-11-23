@@ -30,16 +30,15 @@ public final class AproveitamentoDtos {
 
     public record CriarSolicitacao(
             @NotNull UUID alunoId,
-            @NotBlank String curso,
-            @NotBlank String disciplinaDestino,
-            @NotNull @Positive Integer cargaHorariaDestino,
+            @NotNull UUID disciplinaDestinoId,
             @NotEmpty List<@Valid DisciplinaCursadaEntrada> disciplinas) {
     }
 
     public record DisciplinaCursadaEntrada(
             @NotBlank String nome,
             @NotBlank String instituicao,
-            @NotNull @Positive Integer cargaHoraria) {
+            @NotNull @Positive Integer cargaHoraria,
+            @NotBlank String ementa) {
     }
 
     public record AcaoRequest(@Size(max = 2000) String observacao) {
@@ -55,9 +54,11 @@ public final class AproveitamentoDtos {
         }
     }
 
-    public record DisciplinaCursadaResposta(UUID id, String nome, String instituicao, Integer cargaHoraria) {
+    public record DisciplinaCursadaResposta(UUID id, String nome, String instituicao, Integer cargaHoraria,
+                                            String ementa) {
         public static DisciplinaCursadaResposta de(DisciplinaCursada d) {
-            return new DisciplinaCursadaResposta(d.getId(), d.getNome(), d.getInstituicao(), d.getCargaHoraria());
+            return new DisciplinaCursadaResposta(d.getId(), d.getNome(), d.getInstituicao(), d.getCargaHoraria(),
+                    d.getEmenta());
         }
     }
 

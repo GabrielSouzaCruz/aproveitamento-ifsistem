@@ -3,7 +3,6 @@ package ifsuldeminas.edu.br.ifsystem.aproveitamento.service;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.HistoricoStatus;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Solicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusSolicitacao;
-import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.CoordenadorRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.HistoricoStatusRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.SolicitacaoRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.transicao.TransicaoStatus;
@@ -24,11 +23,11 @@ public class FluxoStatusService {
     private final Map<String, TransicaoStatus> transicoes;
     private final SolicitacaoRepository solicitacoes;
     private final HistoricoStatusRepository historicos;
-    private final CoordenadorRepository coordenadores;
+    private final CatalogoService coordenadores;
     private final ApplicationEventPublisher eventos;
 
     public FluxoStatusService(List<TransicaoStatus> transicoes, SolicitacaoRepository solicitacoes,
-                              HistoricoStatusRepository historicos, CoordenadorRepository coordenadores,
+                              HistoricoStatusRepository historicos, CatalogoService coordenadores,
                               ApplicationEventPublisher eventos) {
         Map<String, TransicaoStatus> porAcao = new HashMap<>();
         for (TransicaoStatus t : transicoes) {
@@ -58,7 +57,7 @@ public class FluxoStatusService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solicitacao pertence a outro aluno");
 
         if (transicao.exigeCoordenador()
-                && !coordenadores.existsByProfessorIdAndCurso(usuarioId, solicitacao.getCurso()))
+                && !coordenadores.coordena(usuarioId, solicitacao))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Professor nao coordena o curso da solicitacao");
 
         StatusSolicitacao atual = solicitacao.getStatus();

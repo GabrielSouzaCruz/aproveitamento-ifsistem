@@ -3,7 +3,6 @@ package ifsuldeminas.edu.br.ifsystem.aproveitamento.service;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.HistoricoStatus;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Solicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusSolicitacao;
-import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.CoordenadorRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.HistoricoStatusRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.SolicitacaoRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.transicao.AnalisarTransicao;
@@ -55,7 +54,7 @@ class FluxoStatusServiceTest {
 
     private SolicitacaoRepository solicitacoes;
     private HistoricoStatusRepository historicos;
-    private CoordenadorRepository coordenadores;
+    private CatalogoService coordenadores;
     private ApplicationEventPublisher eventos;
     private FluxoStatusService service;
     private UUID alunoId;
@@ -66,7 +65,7 @@ class FluxoStatusServiceTest {
     void preparar() {
         solicitacoes = mock(SolicitacaoRepository.class);
         historicos = mock(HistoricoStatusRepository.class);
-        coordenadores = mock(CoordenadorRepository.class);
+        coordenadores = mock(CatalogoService.class);
         eventos = mock(ApplicationEventPublisher.class);
         service = new FluxoStatusService(todasTransicoes(), solicitacoes, historicos, coordenadores, eventos);
         alunoId = UUID.randomUUID();
@@ -74,7 +73,7 @@ class FluxoStatusServiceTest {
         solicitacao = new Solicitacao(alunoId, CURSO, "Banco de Dados", 60);
         when(solicitacoes.findById(solicitacaoId)).thenReturn(Optional.of(solicitacao));
         when(solicitacoes.save(any(Solicitacao.class))).thenAnswer(i -> i.getArgument(0));
-        when(coordenadores.existsByProfessorIdAndCurso(any(), any())).thenReturn(true);
+        when(coordenadores.coordena(any(), any())).thenReturn(true);
     }
 
     @ParameterizedTest
@@ -138,7 +137,7 @@ class FluxoStatusServiceTest {
 
     @Test
     void naoCoordenadorComStatusErradoRetorna403() {
-        when(coordenadores.existsByProfessorIdAndCurso(any(), any())).thenReturn(false);
+        when(coordenadores.coordena(any(), any())).thenReturn(false);
         solicitacao.alterarStatus(StatusSolicitacao.ANALISE);
         assertStatus(() -> service.executar(solicitacaoId, "deferir", UUID.randomUUID(), Perfil.PROFESSOR, null),
                 HttpStatus.FORBIDDEN);
@@ -154,7 +153,7 @@ class FluxoStatusServiceTest {
 
     @Test
     void professorQueNaoCoordenaOCursoRetorna403ParaDeferirEIndeferir() {
-        when(coordenadores.existsByProfessorIdAndCurso(any(), any())).thenReturn(false);
+        when(coordenadores.coordena(any(), any())).thenReturn(false);
         for (String acao : List.of("deferir", "indeferir")) {
             solicitacao.alterarStatus(StatusSolicitacao.DECISAO);
             assertStatus(() -> service.executar(solicitacaoId, acao, UUID.randomUUID(), Perfil.PROFESSOR, null),
@@ -166,7 +165,7 @@ class FluxoStatusServiceTest {
 
     @Test
     void analisarNaoExigeCoordenador() {
-        when(coordenadores.existsByProfessorIdAndCurso(any(), any())).thenReturn(false);
+        when(coordenadores.coordena(any(), any())).thenReturn(false);
         solicitacao.alterarStatus(StatusSolicitacao.ANALISE);
         Solicitacao r = service.executar(solicitacaoId, "analisar", UUID.randomUUID(), Perfil.PROFESSOR, null);
         assertThat(r.getStatus()).isEqualTo(StatusSolicitacao.DECISAO);

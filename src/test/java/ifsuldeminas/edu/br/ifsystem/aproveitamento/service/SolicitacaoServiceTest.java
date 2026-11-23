@@ -7,6 +7,8 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.Histor
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.SolicitacaoDetalhe;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.SolicitacaoResumo;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Anexo;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Curso;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.DisciplinaCurso;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.DisciplinaCursada;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.HistoricoStatus;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.PreDiagnostico;
@@ -45,6 +47,11 @@ class SolicitacaoServiceTest {
         return tem.persist(s);
     }
 
+    private DisciplinaCurso disciplinaDoCatalogo() {
+        Curso curso = tem.persist(new Curso("ADS", "Analise e Desenvolvimento de Sistemas"));
+        return tem.persist(new DisciplinaCurso(curso, "BD", "Banco de Dados", 60, "modelagem sql"));
+    }
+
     private void sincronizar() {
         tem.flush();
         tem.clear();
@@ -61,16 +68,18 @@ class SolicitacaoServiceTest {
     @Test
     void criarSalvaSolicitacaoEDisciplinas() {
         UUID aluno = UUID.randomUUID();
-        CriarSolicitacao dto = new CriarSolicitacao(aluno, "ADS", "Banco de Dados", 60, List.of(
-                new DisciplinaCursadaEntrada("BD I", "UFLA", 40),
-                new DisciplinaCursadaEntrada("BD II", "UFLA", 30)));
+        DisciplinaCurso destino = disciplinaDoCatalogo();
+        CriarSolicitacao dto = new CriarSolicitacao(aluno, destino.getId(), List.of(
+                new DisciplinaCursadaEntrada("BD I", "UFLA", 40, "ementa de teste"),
+                new DisciplinaCursadaEntrada("BD II", "UFLA", 30, "ementa de teste")));
 
         Solicitacao criada = service.criar(dto);
         sincronizar();
 
         Solicitacao salva = tem.find(Solicitacao.class, criada.getId());
         assertThat(salva.getAlunoId()).isEqualTo(aluno);
-        assertThat(salva.getCurso()).isEqualTo("ADS");
+        assertThat(salva.getDisciplinaCursoDestino().getId()).isEqualTo(destino.getId());
+        assertThat(salva.getCurso()).isEqualTo("Analise e Desenvolvimento de Sistemas");
         assertThat(salva.getDisciplinaDestino()).isEqualTo("Banco de Dados");
         assertThat(salva.getCargaHorariaDestino()).isEqualTo(60);
         assertThat(salva.getStatus()).isEqualTo(StatusSolicitacao.RASCUNHO);
@@ -79,10 +88,10 @@ class SolicitacaoServiceTest {
                 .createQuery("select d from DisciplinaCursada d where d.solicitacao.id = :id", DisciplinaCursada.class)
                 .setParameter("id", criada.getId()).getResultList();
         assertThat(ds).extracting(DisciplinaCursada::getNome, DisciplinaCursada::getInstituicao,
-                        DisciplinaCursada::getCargaHoraria)
+                        DisciplinaCursada::getCargaHoraria, DisciplinaCursada::getEmenta)
                 .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple("BD I", "UFLA", 40),
-                        org.assertj.core.groups.Tuple.tuple("BD II", "UFLA", 30));
+                        org.assertj.core.groups.Tuple.tuple("BD I", "UFLA", 40, "ementa de teste"),
+                        org.assertj.core.groups.Tuple.tuple("BD II", "UFLA", 30, "ementa de teste"));
 
         List<HistoricoStatus> hs = tem.getEntityManager()
                 .createQuery("select h from HistoricoStatus h where h.solicitacao.id = :id", HistoricoStatus.class)
@@ -93,6 +102,42 @@ class SolicitacaoServiceTest {
             assertThat(h.getResponsavelId()).isEqualTo(aluno);
             assertThat(h.getObservacao()).isNull();
         });
+    }
+
+    @Test
+    void criarComDisciplinaDestinoInexistenteDa422() {
+        CriarSolicitacao dto = new CriarSolicitacao(UUID.randomUUID(), UUID.randomUUID(),
+                List.of(new DisciplinaCursadaEntrada("BD I", "UFLA", 40, "ementa de teste")));
+
+        assertThatThrownBy(() -> service.criar(dto))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY));
+    }
+
+    @Test
+    void criarComDisciplinaDestinoInativaDa422() {
+        DisciplinaCurso destino = disciplinaDoCatalogo();
+        destino.definirAtivo(false);
+        sincronizar();
+        CriarSolicitacao dto = new CriarSolicitacao(UUID.randomUUID(), destino.getId(),
+                List.of(new DisciplinaCursadaEntrada("BD I", "UFLA", 40, "ementa de teste")));
+
+        assertThatThrownBy(() -> service.criar(dto))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY));
+    }
+
+    @Test
+    void criarMantemTextoCopiadoMesmoSeOCatalogoMudar() {
+        DisciplinaCurso destino = disciplinaDoCatalogo();
+        Solicitacao criada = service.criar(new CriarSolicitacao(UUID.randomUUID(), destino.getId(),
+                List.of(new DisciplinaCursadaEntrada("BD I", "UFLA", 40, "ementa de teste"))));
+        destino.atualizar("BD", "Banco de Dados Avancado", 90, "nova ementa");
+        sincronizar();
+
+        Solicitacao salva = tem.find(Solicitacao.class, criada.getId());
+        assertThat(salva.getDisciplinaDestino()).isEqualTo("Banco de Dados");
+        assertThat(salva.getCargaHorariaDestino()).isEqualTo(60);
     }
 
     // ---------- buscar ----------
@@ -120,7 +165,7 @@ class SolicitacaoServiceTest {
     @Test
     void detalharMontaDetalheCompleto() {
         Solicitacao s = persistir(UUID.randomUUID(), StatusSolicitacao.ANALISE);
-        DisciplinaCursada d = tem.persist(new DisciplinaCursada(s, "BD I", "UFLA", 40));
+        DisciplinaCursada d = tem.persist(new DisciplinaCursada(s, "BD I", "UFLA", 40, "ementa de teste"));
         Anexo a = tem.persist(new Anexo(s, "historico.pdf", "application/pdf", 10L));
         PreDiagnostico antigo = new PreDiagnostico(s, StatusPreDiagnostico.FALHA,
                 new BigDecimal("40.00"), null, "antigo", "p", "m");
@@ -134,7 +179,7 @@ class SolicitacaoServiceTest {
 
         assertThat(det.id()).isEqualTo(s.getId());
         assertThat(det.status()).isEqualTo(StatusSolicitacao.ANALISE);
-        assertThat(det.disciplinas()).containsExactly(new DisciplinaCursadaResposta(d.getId(), "BD I", "UFLA", 40));
+        assertThat(det.disciplinas()).containsExactly(new DisciplinaCursadaResposta(d.getId(), "BD I", "UFLA", 40, "ementa de teste"));
         assertThat(det.anexos()).singleElement().satisfies(r -> assertThat(r.id()).isEqualTo(a.getId()));
         assertThat(det.preDiagnostico().justificativa()).isEqualTo("recente");
     }

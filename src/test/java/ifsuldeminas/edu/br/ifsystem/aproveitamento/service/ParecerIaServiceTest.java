@@ -2,11 +2,15 @@ package ifsuldeminas.edu.br.ifsystem.aproveitamento.service;
 
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.CriarSolicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.DisciplinaCursadaEntrada;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Curso;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.DisciplinaCurso;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.ParecerIa;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.RecomendacaoIa;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Solicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusParecerIa;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusSolicitacao;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.CursoRepository;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.DisciplinaCursoRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.ParecerIaRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.SolicitacaoRepository;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
@@ -43,9 +47,18 @@ class ParecerIaServiceTest {
     @MockitoSpyBean
     private AnalisadorEquivalencia analisador;
 
+    @Autowired
+    private CursoRepository cursos;
+    @Autowired
+    private DisciplinaCursoRepository catalogo;
+
+    private static final String EMENTA = "Modelagem relacional, normalizacao e linguagem SQL";
+
     private Solicitacao rascunho(UUID aluno) {
-        return solicitacoes.criar(new CriarSolicitacao(aluno, "ADS", "Banco de Dados", 60,
-                List.of(new DisciplinaCursadaEntrada("BD I", "UFLA", 40))));
+        Curso curso = cursos.save(new Curso("T" + UUID.randomUUID().toString().substring(0, 8), "Curso de Teste"));
+        DisciplinaCurso destino = catalogo.save(new DisciplinaCurso(curso, "BD", "Banco de Dados", 60, EMENTA));
+        return solicitacoes.criar(new CriarSolicitacao(aluno, destino.getId(),
+                List.of(new DisciplinaCursadaEntrada("BD I", "UFLA", 60, EMENTA))));
     }
 
     private ParecerIa aguardarStatus(UUID solicitacaoId, StatusParecerIa esperado) {
@@ -63,9 +76,9 @@ class ParecerIaServiceTest {
         fluxo.executar(s.getId(), "enviar", aluno, Perfil.ALUNO, null);
 
         ParecerIa parecer = aguardarStatus(s.getId(), StatusParecerIa.CONCLUIDO);
-        assertThat(parecer.getRecomendacao()).isEqualTo(RecomendacaoIa.INCONCLUSIVO);
-        assertThat(parecer.getSimilaridade()).isEqualTo(50);
-        assertThat(parecer.getModelo()).isEqualTo("fake");
+        assertThat(parecer.getRecomendacao()).isEqualTo(RecomendacaoIa.SUGERE_DEFERIR);
+        assertThat(parecer.getSimilaridade()).isEqualTo(100);
+        assertThat(parecer.getModelo()).isEqualTo("heuristica-local-v1");
         assertThat(parecer.getErro()).isNull();
         assertThat(pareceres.findAll().stream()
                 .filter(p -> p.getSolicitacao().getId().equals(s.getId()))).hasSize(1);
