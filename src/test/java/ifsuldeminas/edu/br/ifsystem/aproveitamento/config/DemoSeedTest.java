@@ -1,0 +1,83 @@
+package ifsuldeminas.edu.br.ifsystem.aproveitamento.config;
+
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Solicitacao;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusParecerIa;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusSolicitacao;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.CoordenadorRepository;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.ParecerIaRepository;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.SolicitacaoRepository;
+import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
+import ifsuldeminas.edu.br.ifsystem.usuario.repository.UsuarioRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static ifsuldeminas.edu.br.ifsystem.aproveitamento.config.DemoSeed.*;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@SpringBootTest(properties = {
+        // Banco proprio em memoria: nao toca ./data/ nem o banco compartilhado dos outros testes.
+        "spring.datasource.url=jdbc:h2:mem:demoseed;DB_CLOSE_DELAY=-1",
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.h2.console.enabled=false"
+})
+@ActiveProfiles("demo")
+class DemoSeedTest {
+
+    @Autowired
+    private DemoSeed seed;
+    @Autowired
+    private UsuarioRepository usuarios;
+    @Autowired
+    private SolicitacaoRepository solicitacoes;
+    @Autowired
+    private CoordenadorRepository coordenadores;
+    @Autowired
+    private ParecerIaRepository pareceres;
+
+    @Test
+    void criaUsuariosCoordenadorESolicitacoesNosStatusEsperados() {
+        assertThat(usuarios.findById(ALUNO_ID)).get().extracting(u -> u.getPerfil()).isEqualTo(Perfil.ALUNO);
+        assertThat(usuarios.findById(SERVIDOR_ID)).get().extracting(u -> u.getPerfil()).isEqualTo(Perfil.SERVIDOR);
+        assertThat(usuarios.findById(PROFESSOR_ID)).get().extracting(u -> u.getPerfil()).isEqualTo(Perfil.PROFESSOR);
+        assertThat(coordenadores.existsByProfessorIdAndCurso(PROFESSOR_ID, CURSO)).isTrue();
+
+        Map<java.util.UUID, StatusSolicitacao> status = solicitacoes.findAll().stream()
+                .filter(s -> s.getAlunoId().equals(ALUNO_ID))
+                .collect(Collectors.toMap(Solicitacao::getId, Solicitacao::getStatus));
+        assertThat(status).containsExactlyInAnyOrderEntriesOf(Map.of(
+                SOLICITACAO_RASCUNHO_ID, StatusSolicitacao.RASCUNHO,
+                SOLICITACAO_ENVIADA_ID, StatusSolicitacao.ENVIADA,
+                SOLICITACAO_DEFERIDA_ID, StatusSolicitacao.DEFERIDA));
+    }
+
+    @Test
+    void geraParecerDaIaParaASolicitacaoEnviada() throws InterruptedException {
+        // O parecer e gerado de forma assincrona apos o commit do seed.
+        long limite = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < limite
+                && pareceres.findFirstBySolicitacaoIdOrderByGeradoEmDesc(SOLICITACAO_ENVIADA_ID)
+                .filter(p -> p.getStatus() == StatusParecerIa.CONCLUIDO).isEmpty())
+            Thread.sleep(100);
+
+        assertThat(pareceres.findFirstBySolicitacaoIdOrderByGeradoEmDesc(SOLICITACAO_ENVIADA_ID))
+                .get().extracting(p -> p.getStatus()).isEqualTo(StatusParecerIa.CONCLUIDO);
+    }
+
+    @Test
+    void rodarDeNovoNaoDuplicaDados() {
+        long usuariosAntes = usuarios.count();
+        long solicitacoesAntes = solicitacoes.count();
+        long coordenadoresAntes = coordenadores.count();
+
+        seed.run();
+
+        assertThat(usuarios.count()).isEqualTo(usuariosAntes);
+        assertThat(solicitacoes.count()).isEqualTo(solicitacoesAntes);
+        assertThat(coordenadores.count()).isEqualTo(coordenadoresAntes);
+    }
+}
