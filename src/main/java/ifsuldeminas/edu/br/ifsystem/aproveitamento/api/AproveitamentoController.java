@@ -82,10 +82,13 @@ public class AproveitamentoController {
 
     @GetMapping
     public List<SolicitacaoResumo> listar(@RequestParam(required = false) StatusSolicitacao status,
-                                          @RequestParam(required = false) UUID alunoId) {
+                                          @RequestParam(required = false) UUID alunoId,
+                                          @RequestParam(required = false) UUID cursoId) {
         Usuario usuario = usuarioAtual();
         UUID filtroAluno = usuario.perfil() == Perfil.ALUNO ? usuario.id() : alunoId;
-        return solicitacoes.listar(status, filtroAluno);
+        // Professor so enxerga solicitacoes dos cursos que coordena.
+        UUID filtroProfessor = usuario.perfil() == Perfil.PROFESSOR ? usuario.id() : null;
+        return solicitacoes.listar(status, filtroAluno, cursoId, filtroProfessor);
     }
 
     @GetMapping("/{id}/historico")

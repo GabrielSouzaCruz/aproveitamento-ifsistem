@@ -113,6 +113,12 @@ public class CatalogoController {
 
     // ---------- Coordenadores ----------
 
+    @GetMapping("/{id}/coordenadores")
+    public List<CoordenadorResposta> listarCoordenadores(@PathVariable UUID id) {
+        exigirServidor();
+        return catalogo.listarCoordenadores(id).stream().map(CoordenadorResposta::de).toList();
+    }
+
     @PostMapping("/{id}/coordenadores")
     public ResponseEntity<CoordenadorResposta> adicionarCoordenador(@PathVariable UUID id,
                                                                    @Valid @RequestBody CoordenadorRequest dados) {

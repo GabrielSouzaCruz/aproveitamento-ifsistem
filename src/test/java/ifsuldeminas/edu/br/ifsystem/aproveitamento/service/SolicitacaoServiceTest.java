@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
-@Import(SolicitacaoService.class)
+@Import({SolicitacaoService.class, CatalogoService.class})
 class SolicitacaoServiceTest {
 
     @Autowired
@@ -252,7 +252,7 @@ class SolicitacaoServiceTest {
     @Test
     void listarSemFiltrosRetornaTodas() {
         Massa m = massa();
-        assertThat(ids(service.listar(null, null))).containsExactlyInAnyOrder(
+        assertThat(ids(service.listar(null, null, null, null))).containsExactlyInAnyOrder(
                 m.alunoRascunho().getId(), m.alunoEnviada().getId(),
                 m.outroEnviada().getId(), m.outroAnalise().getId());
     }
@@ -260,22 +260,67 @@ class SolicitacaoServiceTest {
     @Test
     void listarSoPorStatus() {
         Massa m = massa();
-        assertThat(ids(service.listar(StatusSolicitacao.ENVIADA, null)))
+        assertThat(ids(service.listar(StatusSolicitacao.ENVIADA, null, null, null)))
                 .containsExactlyInAnyOrder(m.alunoEnviada().getId(), m.outroEnviada().getId());
     }
 
     @Test
     void listarSoPorAluno() {
         Massa m = massa();
-        assertThat(ids(service.listar(null, m.aluno())))
+        assertThat(ids(service.listar(null, m.aluno(), null, null)))
                 .containsExactlyInAnyOrder(m.alunoRascunho().getId(), m.alunoEnviada().getId());
     }
 
     @Test
     void listarPorAlunoEStatus() {
         Massa m = massa();
-        assertThat(ids(service.listar(StatusSolicitacao.ENVIADA, m.aluno())))
+        assertThat(ids(service.listar(StatusSolicitacao.ENVIADA, m.aluno(), null, null)))
                 .containsExactly(m.alunoEnviada().getId());
-        assertThat(service.listar(StatusSolicitacao.ANALISE, m.aluno())).isEmpty();
+        assertThat(service.listar(StatusSolicitacao.ANALISE, m.aluno(), null, null)).isEmpty();
+    }
+
+    @Test
+    void listarPorCursoEPorProfessorCoordenador() {
+        UUID aluno = UUID.randomUUID();
+        UUID professor = UUID.randomUUID();
+        DisciplinaCurso ads = disciplinaDoCatalogo();
+        Curso outroCurso = tem.persist(new Curso("SI", "Sistemas de Informacao"));
+        DisciplinaCurso redes = tem.persist(new DisciplinaCurso(outroCurso, "RD", "Redes", 60, "tcp ip"));
+        tem.persist(new ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Coordenador(professor, ads.getCurso()));
+        Solicitacao doAds = tem.persist(new Solicitacao(aluno, ads));
+        tem.persist(new Solicitacao(aluno, redes));
+        tem.persist(persistirSemCatalogo(aluno));
+        sincronizar();
+
+        assertThat(ids(service.listar(null, null, ads.getCurso().getId(), null))).containsExactly(doAds.getId());
+        assertThat(ids(service.listar(null, null, null, professor))).containsExactly(doAds.getId());
+        assertThat(service.listar(null, null, null, UUID.randomUUID())).isEmpty();
+    }
+
+    private static Solicitacao persistirSemCatalogo(UUID aluno) {
+        return new Solicitacao(aluno, "Outro curso", "Disciplina antiga", 30);
+    }
+
+    @Test
+    void detalharExpoeCursoEEmentaDeDestino() {
+        DisciplinaCurso destino = disciplinaDoCatalogo();
+        Solicitacao s = tem.persist(new Solicitacao(UUID.randomUUID(), destino));
+        sincronizar();
+
+        SolicitacaoDetalhe d = service.detalhar(s.getId());
+
+        assertThat(d.cursoId()).isEqualTo(destino.getCurso().getId());
+        assertThat(d.ementaDestino()).isEqualTo("modelagem sql");
+    }
+
+    @Test
+    void detalharSemCatalogoTemCursoEEmentaNulos() {
+        Solicitacao s = persistir(UUID.randomUUID(), StatusSolicitacao.RASCUNHO);
+        sincronizar();
+
+        SolicitacaoDetalhe d = service.detalhar(s.getId());
+
+        assertThat(d.cursoId()).isNull();
+        assertThat(d.ementaDestino()).isNull();
     }
 }
