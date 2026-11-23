@@ -29,10 +29,18 @@ class AdminBootstrapTest {
     }
 
     @Test
-    void naoFazNadaSeJaExisteServidor() {
-        when(repo.existsByPerfil(Perfil.SERVIDOR)).thenReturn(true);
-        com("52998224725", "senha-forte-1").run();
+    void naoFazNadaSeJaExisteUsuarioComOCpfDoAdmin() {
+        when(repo.existsByCpf("52998224725")).thenReturn(true);
+        com("529.982.247-25", "senha-forte-1").run();
         verify(usuarios, never()).criar(any(), any());
+    }
+
+    @Test
+    void criaOAdminMesmoHavendoOutroServidor() {
+        when(repo.existsByPerfil(Perfil.SERVIDOR)).thenReturn(true);
+        when(repo.existsByCpf("52998224725")).thenReturn(false);
+        com("52998224725", "senha-forte-1").run();
+        verify(usuarios).criar(any(), eq(Perfil.SERVIDOR));
     }
 
     @Test

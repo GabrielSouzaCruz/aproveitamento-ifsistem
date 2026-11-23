@@ -35,6 +35,12 @@ public final class AproveitamentoDtos {
             @NotEmpty List<@Valid DisciplinaCursadaEntrada> disciplinas) {
     }
 
+    /** Edicao de rascunho/pendencia: novo destino e a lista completa (substitui a anterior). */
+    public record AtualizarSolicitacao(
+            @NotNull UUID disciplinaDestinoId,
+            @NotEmpty List<@Valid DisciplinaCursadaEntrada> disciplinas) {
+    }
+
     public record DisciplinaCursadaEntrada(
             @NotBlank String nome,
             @NotBlank String instituicao,
@@ -80,22 +86,31 @@ public final class AproveitamentoDtos {
     }
 
     /** {@code cursoId} e {@code ementaDestino} sao nulos nas solicitacoes anteriores ao catalogo.
-     *  {@code preDiagnostico} e nulo quando a solicitacao ainda nao tem pre-diagnostico. */
+     *  {@code preDiagnostico} e nulo quando a solicitacao ainda nao tem pre-diagnostico.
+     *  {@code podeDecidir} e true so para o professor coordenador do curso da solicitacao. */
     public record SolicitacaoDetalhe(UUID id, UUID alunoId, String curso, UUID cursoId, String disciplinaDestino,
                                      Integer cargaHorariaDestino, String ementaDestino, StatusSolicitacao status,
                                      OffsetDateTime criadoEm, OffsetDateTime atualizadoEm,
                                      List<DisciplinaCursadaResposta> disciplinas,
                                      List<AnexoResposta> anexos,
-                                     PreDiagnosticoResposta preDiagnostico) {
+                                     PreDiagnosticoResposta preDiagnostico,
+                                     boolean podeDecidir) {
         public static SolicitacaoDetalhe de(Solicitacao s, List<DisciplinaCursada> disciplinas,
                                             List<Anexo> anexos, PreDiagnostico preDiagnostico) {
+            return de(s, disciplinas, anexos, preDiagnostico, false);
+        }
+
+        public static SolicitacaoDetalhe de(Solicitacao s, List<DisciplinaCursada> disciplinas,
+                                            List<Anexo> anexos, PreDiagnostico preDiagnostico,
+                                            boolean podeDecidir) {
             DisciplinaCurso destino = s.getDisciplinaCursoDestino();
             return new SolicitacaoDetalhe(s.getId(), s.getAlunoId(), s.getCurso(),
                     destino == null ? null : destino.getCurso().getId(), s.getDisciplinaDestino(),
                     s.getCargaHorariaDestino(), destino == null ? null : destino.getEmenta(), s.getStatus(), s.getCriadoEm(), s.getAtualizadoEm(),
                     disciplinas.stream().map(DisciplinaCursadaResposta::de).toList(),
                     anexos.stream().map(AnexoResposta::de).toList(),
-                    preDiagnostico == null ? null : PreDiagnosticoResposta.de(preDiagnostico));
+                    preDiagnostico == null ? null : PreDiagnosticoResposta.de(preDiagnostico),
+                    podeDecidir);
         }
     }
 

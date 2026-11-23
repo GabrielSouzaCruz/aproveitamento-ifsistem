@@ -29,6 +29,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.AtualizarSolicitacao;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -77,7 +79,16 @@ public class AproveitamentoController {
     public SolicitacaoDetalhe detalhar(@PathVariable UUID id) {
         Usuario usuario = usuarioAtual();
         exigirDonoSeAluno(usuario, solicitacoes.buscar(id).getAlunoId());
-        return solicitacoes.detalhar(id);
+        return solicitacoes.detalhar(id, usuario.id(), usuario.perfil());
+    }
+
+    @PutMapping("/{id}")
+    public SolicitacaoResumo atualizar(@PathVariable UUID id, @Valid @RequestBody AtualizarSolicitacao dados) {
+        Usuario usuario = usuarioAtual();
+        if (usuario.perfil() != Perfil.ALUNO)
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Apenas o aluno dono pode editar a solicitacao");
+        exigirDonoSeAluno(usuario, solicitacoes.buscar(id).getAlunoId());
+        return SolicitacaoResumo.de(solicitacoes.atualizar(id, dados));
     }
 
     @GetMapping

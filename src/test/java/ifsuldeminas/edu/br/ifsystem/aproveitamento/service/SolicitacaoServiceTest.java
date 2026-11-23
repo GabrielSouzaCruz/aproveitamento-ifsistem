@@ -15,6 +15,9 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.PreDiagnostico;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Solicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusPreDiagnostico;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusSolicitacao;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.AtualizarSolicitacao;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Coordenador;
+import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -175,7 +178,7 @@ class SolicitacaoServiceTest {
                 new BigDecimal("90.00"), new BigDecimal("80.00"), "recente", "p", "m"));
         sincronizar();
 
-        SolicitacaoDetalhe det = service.detalhar(s.getId());
+        SolicitacaoDetalhe det = service.detalhar(s.getId(), UUID.randomUUID(), Perfil.SERVIDOR);
 
         assertThat(det.id()).isEqualTo(s.getId());
         assertThat(det.status()).isEqualTo(StatusSolicitacao.ANALISE);
@@ -189,7 +192,7 @@ class SolicitacaoServiceTest {
         Solicitacao s = persistir(UUID.randomUUID(), StatusSolicitacao.RASCUNHO);
         sincronizar();
 
-        SolicitacaoDetalhe det = service.detalhar(s.getId());
+        SolicitacaoDetalhe det = service.detalhar(s.getId(), UUID.randomUUID(), Perfil.SERVIDOR);
         assertThat(det.preDiagnostico()).isNull();
         assertThat(det.disciplinas()).isEmpty();
         assertThat(det.anexos()).isEmpty();
@@ -197,7 +200,7 @@ class SolicitacaoServiceTest {
 
     @Test
     void detalharInexistenteDa404() {
-        assertNotFound(() -> service.detalhar(UUID.randomUUID()));
+        assertNotFound(() -> service.detalhar(UUID.randomUUID(), UUID.randomUUID(), Perfil.SERVIDOR));
     }
 
     // ---------- historico ----------
@@ -307,10 +310,81 @@ class SolicitacaoServiceTest {
         Solicitacao s = tem.persist(new Solicitacao(UUID.randomUUID(), destino));
         sincronizar();
 
-        SolicitacaoDetalhe d = service.detalhar(s.getId());
+        SolicitacaoDetalhe d = service.detalhar(s.getId(), UUID.randomUUID(), Perfil.SERVIDOR);
 
         assertThat(d.cursoId()).isEqualTo(destino.getCurso().getId());
         assertThat(d.ementaDestino()).isEqualTo("modelagem sql");
+    }
+
+    @Test
+    void podeDecidirSoParaProfessorCoordenadorDoCurso() {
+        DisciplinaCurso destino = disciplinaDoCatalogo();
+        Solicitacao s = tem.persist(new Solicitacao(UUID.randomUUID(), destino));
+        UUID coordenador = UUID.randomUUID();
+        tem.persist(new Coordenador(coordenador, destino.getCurso()));
+        sincronizar();
+
+        assertThat(service.detalhar(s.getId(), coordenador, Perfil.PROFESSOR).podeDecidir()).isTrue();
+        assertThat(service.detalhar(s.getId(), UUID.randomUUID(), Perfil.PROFESSOR).podeDecidir()).isFalse();
+        assertThat(service.detalhar(s.getId(), coordenador, Perfil.SERVIDOR).podeDecidir()).isFalse();
+    }
+
+    private void assertAtualizarFalhaCom(UUID id, AtualizarSolicitacao dto, HttpStatus esperado) {
+        assertThatThrownBy(() -> service.atualizar(id, dto))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(esperado));
+    }
+
+    @Test
+    void atualizarTrocaDestinoESubstituiDisciplinasCursadas() {
+        DisciplinaCurso antigo = disciplinaDoCatalogo();
+        DisciplinaCurso novo = tem.persist(new DisciplinaCurso(antigo.getCurso(), "RD", "Redes", 80, "tcp ip"));
+        Solicitacao s = tem.persist(new Solicitacao(UUID.randomUUID(), antigo));
+        tem.persist(new DisciplinaCursada(s, "Velha", "UFLA", 10, "velha"));
+        sincronizar();
+
+        service.atualizar(s.getId(), new AtualizarSolicitacao(novo.getId(), List.of(
+                new DisciplinaCursadaEntrada("Nova A", "IFSULDEMINAS", 40, "a"),
+                new DisciplinaCursadaEntrada("Nova B", "IFSULDEMINAS", 30, "b"))));
+        sincronizar();
+
+        SolicitacaoDetalhe d = service.detalhar(s.getId(), UUID.randomUUID(), Perfil.SERVIDOR);
+        assertThat(d.disciplinaDestino()).isEqualTo("Redes");
+        assertThat(d.cargaHorariaDestino()).isEqualTo(80);
+        assertThat(d.disciplinas()).extracting(DisciplinaCursadaResposta::nome)
+                .containsExactlyInAnyOrder("Nova A", "Nova B");
+    }
+
+    @Test
+    void atualizarAceitaPendente() {
+        DisciplinaCurso destino = disciplinaDoCatalogo();
+        Solicitacao s = tem.persist(new Solicitacao(UUID.randomUUID(), destino));
+        s.alterarStatus(StatusSolicitacao.PENDENTE);
+        sincronizar();
+
+        Solicitacao atualizada = service.atualizar(s.getId(), new AtualizarSolicitacao(destino.getId(),
+                List.of(new DisciplinaCursadaEntrada("X", "Y", 10, "z"))));
+        assertThat(atualizada.getStatus()).isEqualTo(StatusSolicitacao.PENDENTE);
+    }
+
+    @Test
+    void atualizarForaDeRascunhoOuPendenteDa409() {
+        DisciplinaCurso destino = disciplinaDoCatalogo();
+        Solicitacao s = tem.persist(new Solicitacao(UUID.randomUUID(), destino));
+        s.alterarStatus(StatusSolicitacao.ENVIADA);
+        sincronizar();
+
+        assertAtualizarFalhaCom(s.getId(), new AtualizarSolicitacao(destino.getId(),
+                List.of(new DisciplinaCursadaEntrada("X", "Y", 10, "z"))), HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void atualizarComDestinoInexistenteDa422() {
+        Solicitacao s = persistir(UUID.randomUUID(), StatusSolicitacao.RASCUNHO);
+        sincronizar();
+
+        assertAtualizarFalhaCom(s.getId(), new AtualizarSolicitacao(UUID.randomUUID(),
+                List.of(new DisciplinaCursadaEntrada("X", "Y", 10, "z"))), HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
     @Test
@@ -318,7 +392,7 @@ class SolicitacaoServiceTest {
         Solicitacao s = persistir(UUID.randomUUID(), StatusSolicitacao.RASCUNHO);
         sincronizar();
 
-        SolicitacaoDetalhe d = service.detalhar(s.getId());
+        SolicitacaoDetalhe d = service.detalhar(s.getId(), UUID.randomUUID(), Perfil.SERVIDOR);
 
         assertThat(d.cursoId()).isNull();
         assertThat(d.ementaDestino()).isNull();

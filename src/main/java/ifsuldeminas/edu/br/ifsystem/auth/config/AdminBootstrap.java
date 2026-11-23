@@ -1,6 +1,7 @@
 package ifsuldeminas.edu.br.ifsystem.auth.config;
 
 import ifsuldeminas.edu.br.ifsystem.usuario.api.UsuarioDtos.CriarUsuario;
+import ifsuldeminas.edu.br.ifsystem.usuario.domain.Cpf;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
 import ifsuldeminas.edu.br.ifsystem.usuario.repository.UsuarioRepository;
 import ifsuldeminas.edu.br.ifsystem.usuario.service.UsuarioService;
@@ -12,7 +13,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/** Cria a primeira conta da secretaria se nao houver nenhum SERVIDOR e ADMIN_CPF/ADMIN_SENHA existirem. */
+/** Cria o SERVIDOR de ADMIN_CPF/ADMIN_SENHA se nao existir usuario com esse CPF (mesmo havendo outros servidores). */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AdminBootstrap implements CommandLineRunner {
@@ -37,10 +38,10 @@ public class AdminBootstrap implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (cpf.isBlank() || senha.isBlank() || repository.existsByPerfil(Perfil.SERVIDOR))
+        if (cpf.isBlank() || senha.isBlank() || repository.existsByCpf(Cpf.normalizar(cpf)))
             return;
         usuarios.criar(new CriarUsuario("Secretaria", cpf, email, "SECRETARIA", senha, null, null, null),
                 Perfil.SERVIDOR);
-        log.info("Conta inicial da secretaria criada (ADMIN_CPF)");
+        log.info("Conta da secretaria criada a partir de ADMIN_CPF");
     }
 }

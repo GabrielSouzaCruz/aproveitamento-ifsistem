@@ -27,13 +27,17 @@ function linhaDisciplina() {
         </fieldset>`;
 }
 
-async function telaNova() {
-    titulo('Nova solicitação');
+/** Nova solicitacao; com `editarId`, reaproveita o formulario para editar rascunho/pendencia (PUT). */
+async function telaNova(editarId) {
+    const edicao = !!editarId;
+    titulo(edicao ? 'Editar solicitação' : 'Nova solicitação');
     app.innerHTML = '<p class="muted carregando">Carregando catálogo</p>';
-    const cursos = await http('/cursos');
+    const [cursos, atual] = await Promise.all([http('/cursos'), edicao ? api('/' + editarId) : Promise.resolve(null)]);
+    if (atual && !STATUS_ANEXO_EDITAVEL.includes(atual.status))
+        return navegar('#/s/' + editarId, 'Esta solicitação não pode mais ser editada.');
 
     app.innerHTML = `
-        <a class="voltar" href="#/">${ICONES.voltar} Voltar para a lista</a>
+        <a class="voltar" href="${edicao ? '#/s/' + esc(editarId) : '#/'}">${ICONES.voltar} Voltar</a>
         <form id="form-nova" class="card">
             <h3>Disciplina que deseja aproveitar</h3>
             <div class="campos-2">
@@ -51,16 +55,17 @@ async function telaNova() {
             <div id="disciplinas">${linhaDisciplina()}</div>
             <button type="button" class="btn btn-sec btn-mini" id="add-disc">+ Adicionar disciplina</button>
 
-            <h3 style="margin-top:1.5rem">Documento comprobatório</h3>
+            ${edicao ? '' : `<h3 style="margin-top:1.5rem">Documento comprobatório</h3>
             <div class="campo">
                 <input type="file" id="arquivo" accept="application/pdf,.pdf" aria-label="Arquivo PDF (histórico ou ementa)">
                 <p class="muted pequeno" style="margin:.3rem 0 0">Opcional agora: PDF de até 5 MB. Você também pode anexar depois, enquanto for rascunho.</p>
-            </div>
+            </div>`}
 
             <div class="acoes" style="margin-top:1.25rem">
-                <button type="submit" class="btn btn-sec" data-modo="rascunho">Salvar rascunho</button>
-                <button type="submit" class="btn" data-modo="enviar">Salvar e enviar</button>
-                <a class="btn btn-sec" href="#/">Cancelar</a>
+                ${edicao
+                    ? '<button type="submit" class="btn" data-modo="rascunho">Salvar alterações</button>'
+                    : '<button type="submit" class="btn btn-sec" data-modo="rascunho">Salvar rascunho</button><button type="submit" class="btn" data-modo="enviar">Salvar e enviar</button>'}
+                <a class="btn btn-sec" href="${edicao ? '#/s/' + esc(editarId) : '#/'}">Cancelar</a>
             </div>
             <p class="muted pequeno">O rascunho pode ser conferido, receber anexos e ser enviado a qualquer momento em "Minhas solicitações".</p>
         </form>`;
@@ -101,13 +106,32 @@ async function telaNova() {
     };
     document.getElementById('add-disc').onclick = () => lista.insertAdjacentHTML('beforeend', linhaDisciplina());
 
+    if (atual) {
+        // Pre-preenche destino (curso e disciplina) e as disciplinas cursadas ja cadastradas.
+        lista.innerHTML = atual.disciplinas.map(() => linhaDisciplina()).join('') || linhaDisciplina();
+        atual.disciplinas.forEach((d, i) => {
+            const l = lista.children[i];
+            l.querySelector('[name=nome]').value = d.nome;
+            l.querySelector('[name=instituicao]').value = d.instituicao;
+            l.querySelector('[name=cargaHoraria]').value = d.cargaHoraria;
+            l.querySelector('[name=ementa]').value = d.ementa || '';
+        });
+        if (atual.cursoId) {
+            selCurso.value = atual.cursoId;
+            await selCurso.onchange();
+            const destino = disciplinas.find(x => x.nome === atual.disciplinaDestino);
+            if (destino) { selDisc.value = destino.id; selDisc.onchange(); }
+        }
+    }
+
     form.onsubmit = async e => {
         e.preventDefault();
         const enviar = e.submitter && e.submitter.dataset.modo === 'enviar';
-        const arquivo = document.getElementById('arquivo').files[0];
+        const campoArquivo = document.getElementById('arquivo');
+        const arquivo = campoArquivo ? campoArquivo.files[0] : null;
         if (arquivo && arquivo.size > 5 * 1024 * 1024) return mostrarAviso('Arquivo maior que o limite de 5 MB.');
         const dados = {
-            alunoId: usuarioAtual().id,
+            ...(edicao ? {} : { alunoId: usuarioAtual().id }),
             disciplinaDestinoId: selDisc.value,
             disciplinas: [...lista.querySelectorAll('.linha-disc')].map(l => ({
                 nome: l.querySelector('[name=nome]').value.trim(),
@@ -118,6 +142,17 @@ async function telaNova() {
         };
         const botoes = form.querySelectorAll('[type=submit]');
         botoes.forEach(b => b.disabled = true);
+        if (edicao) {
+            try {
+                await api('/' + editarId, { method: 'PUT', json: dados, ctx: 'solicitacao' });
+                return navegar('#/s/' + editarId, 'Solicitação atualizada.', true);
+            } catch (err) {
+                erro(err);
+                if (err.status === 409) return navegar('#/s/' + editarId);
+                botoes.forEach(b => b.disabled = false);
+                return;
+            }
+        }
         let criada;
         try {
             criada = await api('', { method: 'POST', json: dados, ctx: 'solicitacao' });

@@ -16,17 +16,24 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.DisciplinaCursadaR
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.HistoricoStatusRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.PreDiagnosticoRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.SolicitacaoRepository;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.AtualizarSolicitacao;
+import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /** Criacao e consultas de solicitacoes. Regras de perfil ficam no controller. */
 @Service
 public class SolicitacaoService {
+    private static final Set<StatusSolicitacao> STATUS_EDITAVEIS =
+            EnumSet.of(StatusSolicitacao.RASCUNHO, StatusSolicitacao.PENDENTE);
+
     private final SolicitacaoRepository solicitacoes;
     private final DisciplinaCursadaRepository disciplinas;
     private final AnexoRepository anexos;
@@ -50,10 +57,7 @@ public class SolicitacaoService {
 
     @Transactional
     public Solicitacao criar(CriarSolicitacao d) {
-        DisciplinaCurso destino = catalogo.findById(d.disciplinaDestinoId())
-                .filter(x -> x.isAtivo() && x.getCurso().isAtivo())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                        "disciplinaDestinoId inexistente ou inativa"));
+        DisciplinaCurso destino = destinoAtivo(d.disciplinaDestinoId());
         // Texto (nome, curso, carga horaria) copiado do catalogo: preserva o historico se o catalogo mudar.
         Solicitacao solicitacao = solicitacoes.save(new Solicitacao(d.alunoId(), destino));
         for (DisciplinaCursadaEntrada e : d.disciplinas()) {
@@ -64,13 +68,42 @@ public class SolicitacaoService {
         return solicitacao;
     }
 
-    @Transactional(readOnly = true)
-    public SolicitacaoDetalhe detalhar(UUID id) {
+    /**
+     * Altera o destino e substitui as disciplinas cursadas. So RASCUNHO e PENDENTE aceitam edicao (409);
+     * quem chama garante que o usuario e o aluno dono.
+     */
+    @Transactional
+    public Solicitacao atualizar(UUID id, AtualizarSolicitacao d) {
         Solicitacao s = buscar(id);
+        if (!STATUS_EDITAVEIS.contains(s.getStatus()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Solicitacao so pode ser editada em RASCUNHO ou PENDENTE (status atual: " + s.getStatus() + ")");
+        s.alterarDestino(destinoAtivo(d.disciplinaDestinoId()));
+        disciplinas.deleteAll(disciplinas.findBySolicitacaoId(id));
+        disciplinas.flush();
+        for (DisciplinaCursadaEntrada e : d.disciplinas()) {
+            disciplinas.save(new DisciplinaCursada(s, e.nome(), e.instituicao(), e.cargaHoraria(), e.ementa()));
+        }
+        return solicitacoes.saveAndFlush(s);
+    }
+
+    private DisciplinaCurso destinoAtivo(UUID disciplinaDestinoId) {
+        return catalogo.findById(disciplinaDestinoId)
+                .filter(x -> x.isAtivo() && x.getCurso().isAtivo())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "disciplinaDestinoId inexistente ou inativa"));
+    }
+
+    /** {@code podeDecidir}: o usuario e professor coordenador do curso da solicitacao. */
+    @Transactional(readOnly = true)
+    public SolicitacaoDetalhe detalhar(UUID id, UUID usuarioId, Perfil perfil) {
+        Solicitacao s = buscar(id);
+        boolean podeDecidir = perfil == Perfil.PROFESSOR && coordenadores.coordena(usuarioId, s);
         return SolicitacaoDetalhe.de(s,
                 disciplinas.findBySolicitacaoId(id),
                 anexos.findBySolicitacaoId(id),
-                preDiagnosticos.findBySolicitacaoId(id).orElse(null));
+                preDiagnosticos.findBySolicitacaoId(id).orElse(null),
+                podeDecidir);
     }
 
     @Transactional(readOnly = true)
