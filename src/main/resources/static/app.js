@@ -251,7 +251,7 @@ function telaLogin() {
     document.title = 'Aproveitamento de Disciplinas · IF Conect';
     app.innerHTML = `
         <section class="login">
-            <div class="marca">IF <span>Conect</span></div>
+            <img class="logo-completa" src="img/logo-ifconect.png" alt="IF Conect" width="302" height="230">
             <p class="sobretitulo">Aproveitamento de disciplinas</p>
             <h1>Quem está acessando?</h1>
             <p class="muted">Ambiente de demonstração: escolha um dos usuários de exemplo para entrar.</p>
