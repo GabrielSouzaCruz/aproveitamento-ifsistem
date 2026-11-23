@@ -1,17 +1,20 @@
 'use strict';
 
-/* Tela de demonstracao do fluxo de aproveitamento. JS puro, sem build.
+/* Tela de demonstracao do fluxo de aproveitamento (padrao visual IF Conect). JS puro, sem build.
  * A identidade e provisoria: o usuario escolhido vai nos headers X-Usuario-Id e X-Perfil. */
 
 const API = '/aproveitamentos';
 
 /** Usuarios fixos do seed do profile demo (DemoSeed). */
 const USUARIOS = [
-    { id: '11111111-1111-1111-1111-111111111111', perfil: 'ALUNO', papel: 'Aluno', nome: 'Ana Aluna Demo',
+    { id: '11111111-1111-1111-1111-111111111111', perfil: 'ALUNO', papel: 'Aluno', area: 'Área do estudante',
+      nome: 'Ana Aluna Demo', primeiroNome: 'Ana', saudacao: 'Bem-vinda de volta, Ana!',
       descricao: 'Cria, anexa documentos e envia solicitações.' },
-    { id: '22222222-2222-2222-2222-222222222222', perfil: 'SERVIDOR', papel: 'Secretaria', nome: 'Sergio Servidor Demo',
+    { id: '22222222-2222-2222-2222-222222222222', perfil: 'SERVIDOR', papel: 'Secretaria', area: 'Área da secretaria',
+      nome: 'Sergio Servidor Demo', primeiroNome: 'Sergio', saudacao: 'Bem-vindo de volta, Sergio!',
       descricao: 'Confere documentação, devolve pendências e registra.' },
-    { id: '33333333-3333-3333-3333-333333333333', perfil: 'PROFESSOR', papel: 'Coordenador', nome: 'Paula Professora Demo',
+    { id: '33333333-3333-3333-3333-333333333333', perfil: 'PROFESSOR', papel: 'Coordenador', area: 'Área da coordenação',
+      nome: 'Paula Professora Demo', primeiroNome: 'Paula', saudacao: 'Bem-vinda de volta, professora Paula!',
       descricao: 'Coordena ADS: analisa, vê o parecer da IA e decide.' }
 ];
 
@@ -34,11 +37,23 @@ const STATUS_ROTULO = {
     DEFERIDA: 'Deferida', INDEFERIDA: 'Indeferida', REGISTRADA: 'Registrada'
 };
 
+const STATUS_FINAIS = ['DEFERIDA', 'INDEFERIDA', 'REGISTRADA'];
+
 const RECOMENDACAO_ROTULO = {
     SUGERE_DEFERIR: 'Sugere deferir', SUGERE_INDEFERIR: 'Sugere indeferir', INCONCLUSIVO: 'Inconclusivo'
 };
 
 const STATUS_ANEXO_EDITAVEL = ['RASCUNHO', 'PENDENTE'];
+
+const ICONES = {
+    lista: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+    mais: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
+    seta: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+    voltar: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
+    pdf: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
+    ia: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z"/></svg>',
+    regerar: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>'
+};
 
 const app = document.getElementById('app');
 let pollingParecer = null;
@@ -132,10 +147,19 @@ function nomeUsuario(id) {
     return u ? `${u.nome} (${u.papel})` : 'Sistema';
 }
 
+function iniciais(nome) {
+    const partes = nome.split(' ');
+    return (partes[0][0] + (partes[1] ? partes[1][0] : '')).toUpperCase();
+}
+
 function tamanho(bytes) {
     if (bytes == null) return '';
     if (bytes < 1024) return bytes + ' B';
     return bytes < 1024 * 1024 ? (bytes / 1024).toFixed(0) + ' KB' : (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+function acoesDisponiveis(perfil, status) {
+    return ACOES.filter(a => a.perfil === perfil && a.origens.includes(status));
 }
 
 const aviso = document.getElementById('aviso');
@@ -159,20 +183,44 @@ function erro(e) {
     mostrarAviso(e instanceof ErroApi ? e.message : 'Falha de comunicação com o servidor.');
 }
 
+// ---------- Moldura (menu lateral e barra do topo) ----------
+
+function montarMoldura(u, rota) {
+    document.body.classList.toggle('sem-sessao', !u);
+    if (!u) return;
+    document.getElementById('area-usuario').textContent = u.area;
+    document.getElementById('usuario-nome').textContent = u.nome;
+    document.getElementById('usuario-papel').textContent = u.papel;
+    document.getElementById('usuario-iniciais').textContent = iniciais(u.nome);
+    document.getElementById('hoje').textContent = new Date().toLocaleDateString('pt-BR',
+        { day: 'numeric', month: 'long', year: 'numeric' }) + ' • ' +
+        new Date().toLocaleDateString('pt-BR', { weekday: 'long' });
+
+    const itens = [{ href: '#/', rotulo: 'Aproveitamentos', icone: ICONES.lista, ativo: rota !== 'nova' }];
+    if (u.perfil === 'ALUNO')
+        itens.push({ href: '#/nova', rotulo: 'Nova solicitação', icone: ICONES.mais, ativo: rota === 'nova' });
+    document.getElementById('menu').innerHTML = itens.map(i =>
+        `<a href="${i.href}" class="${i.ativo ? 'ativo' : ''}"${i.ativo ? ' aria-current="page"' : ''}>${i.icone}<span>${esc(i.rotulo)}</span></a>`).join('');
+}
+
+function titulo(texto) {
+    document.getElementById('titulo-pagina').textContent = texto;
+    document.title = texto + ' · IF Conect';
+}
+
 // ---------- Roteamento ----------
 
 async function rotear() {
     clearTimeout(pollingParecer);
     const u = usuarioAtual();
-    document.getElementById('topo-usuario').hidden = !u;
-    if (!u) return telaLogin();
-    document.getElementById('usuario-nome').innerHTML = `<span class="tag">${esc(u.papel)}</span> ${esc(u.nome)}`;
-
     const hash = location.hash.replace(/^#/, '');
     const detalhe = hash.match(/^\/s\/([0-9a-f-]{36})$/i);
+    const nova = hash === '/nova' && u && u.perfil === 'ALUNO';
+    montarMoldura(u, nova ? 'nova' : 'lista');
+    if (!u) return telaLogin();
     try {
         if (detalhe) await telaDetalhe(detalhe[1]);
-        else if (hash === '/nova' && u.perfil === 'ALUNO') telaNova();
+        else if (nova) telaNova();
         else await telaLista();
     } catch (e) {
         if (detalhe) navegar('#/', e instanceof ErroApi ? e.message : 'Falha de comunicação com o servidor.');
@@ -197,19 +245,23 @@ window.addEventListener('hashchange', async () => {
 });
 document.getElementById('btn-sair').onclick = sair;
 
-// ---------- Login ----------
+// ---------- Escolha de usuario ----------
 
 function telaLogin() {
+    document.title = 'Aproveitamento de Disciplinas · IF Conect';
     app.innerHTML = `
         <section class="login">
+            <div class="marca">IF <span>Conect</span></div>
+            <p class="sobretitulo">Aproveitamento de disciplinas</p>
             <h1>Quem está acessando?</h1>
             <p class="muted">Ambiente de demonstração: escolha um dos usuários de exemplo para entrar.</p>
             <div class="perfis">
                 ${USUARIOS.map((u, i) => `
                     <button type="button" class="perfil" data-i="${i}">
-                        <span class="tag">${esc(u.papel)}</span>
+                        <span class="avatar">${esc(iniciais(u.nome))}</span>
+                        <span class="contador">${esc(u.papel)}</span>
                         <strong>${esc(u.nome)}</strong>
-                        <span class="muted pequeno">${esc(u.descricao)}</span>
+                        <span class="muted">${esc(u.descricao)}</span>
                     </button>`).join('')}
             </div>
         </section>`;
@@ -220,29 +272,54 @@ function telaLogin() {
 
 async function telaLista() {
     const u = usuarioAtual();
+    titulo(u.perfil === 'ALUNO' ? 'Minhas solicitações' : 'Aproveitamentos');
     app.innerHTML = '<p class="muted carregando">Carregando solicitações</p>';
     const lista = await api('');
     lista.sort((a, b) => (b.atualizadoEm || '').localeCompare(a.atualizadoEm || ''));
+
+    const aguardando = lista.filter(s => acoesDisponiveis(u.perfil, s.status).length > 0).length;
+    const concluidas = lista.filter(s => STATUS_FINAIS.includes(s.status)).length;
+    const agora = new Date();
+    const mes = agora.toLocaleDateString('pt-BR', { month: 'long' });
+
     app.innerHTML = `
-        <div class="cabecalho">
-            <h1>${u.perfil === 'ALUNO' ? 'Minhas solicitações' : 'Solicitações de aproveitamento'}</h1>
-            ${u.perfil === 'ALUNO' ? '<a class="btn" href="#/nova">+ Nova solicitação</a>' : ''}
-        </div>
-        <div class="card tabela-wrap">
-            <table class="responsiva">
-                <thead><tr><th>Disciplina destino</th><th>Curso</th><th>Status</th><th>Atualizada em</th></tr></thead>
-                <tbody>
-                    ${lista.length === 0 ? '<tr><td colspan="4" class="vazio">Nenhuma solicitação encontrada.</td></tr>' : ''}
-                    ${lista.map(s => `
-                        <tr class="clicavel" data-id="${esc(s.id)}" tabindex="0">
-                            <td data-rotulo="Disciplina"><strong>${esc(s.disciplinaDestino)}</strong></td>
-                            <td data-rotulo="Curso">${esc(s.curso)}</td>
-                            <td data-rotulo="Status">${statusBadge(s.status)}</td>
-                            <td data-rotulo="Atualizada">${data(s.atualizadoEm)}</td>
-                        </tr>`).join('')}
-                </tbody>
-            </table>
-        </div>`;
+        <section class="boas-vindas">
+            <p class="sobretitulo">${agora.getFullYear()} | ${esc(mes)}</p>
+            <h2>${esc(u.saudacao)}</h2>
+            <p>${aguardando === 0
+                ? 'Nenhuma solicitação aguarda ação sua agora.'
+                : `Você tem ${aguardando} ${aguardando === 1 ? 'solicitação que aguarda' : 'solicitações que aguardam'} ação sua.`}</p>
+            ${u.perfil === 'ALUNO' ? `<div class="acoes"><a class="btn" href="#/nova">${ICONES.mais} Nova solicitação</a></div>` : ''}
+        </section>
+
+        <section class="numeros">
+            <div class="numero"><span>${u.perfil === 'ALUNO' ? 'Minhas solicitações' : 'Solicitações no sistema'}</span><strong>${lista.length}</strong></div>
+            <div class="numero ${aguardando ? 'alerta' : ''}"><span>Aguardando sua ação</span><strong>${aguardando}</strong></div>
+            <div class="numero realce"><span>Concluídas</span><strong>${concluidas}</strong></div>
+        </section>
+
+        <section class="card card-tabela">
+            <div class="card-cab">
+                <h3>Solicitações <span class="contador">${lista.length}</span></h3>
+            </div>
+            <div class="tabela-wrap">
+                <table class="responsiva">
+                    <thead><tr><th>Disciplina destino</th><th>Curso</th><th>Status</th><th>Atualizada em</th><th><span hidden>Abrir</span></th></tr></thead>
+                    <tbody>
+                        ${lista.length === 0 ? '<tr><td colspan="5" class="vazio">Nenhuma solicitação encontrada.</td></tr>' : ''}
+                        ${lista.map(s => `
+                            <tr class="clicavel" data-id="${esc(s.id)}" tabindex="0">
+                                <td data-rotulo="Disciplina"><strong>${esc(s.disciplinaDestino)}</strong>
+                                    ${acoesDisponiveis(u.perfil, s.status).length ? '<span class="sub">Aguarda sua ação</span>' : ''}</td>
+                                <td data-rotulo="Curso">${esc(s.curso)}</td>
+                                <td data-rotulo="Status">${statusBadge(s.status)}</td>
+                                <td data-rotulo="Atualizada">${data(s.atualizadoEm)}</td>
+                                <td class="seta">${ICONES.seta}</td>
+                            </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </section>`;
     app.querySelectorAll('tr.clicavel').forEach(tr => {
         const abrir = () => { location.hash = '#/s/' + tr.dataset.id; };
         tr.onclick = abrir;
@@ -254,49 +331,49 @@ async function telaLista() {
 
 async function telaDetalhe(id) {
     const u = usuarioAtual();
+    titulo('Solicitação de aproveitamento');
     app.innerHTML = '<p class="muted carregando">Carregando solicitação</p>';
     const [s, historico] = await Promise.all([api('/' + id), api('/' + id + '/historico')]);
-    const acoes = ACOES.filter(a => a.perfil === u.perfil && a.origens.includes(s.status));
+    const acoes = acoesDisponiveis(u.perfil, s.status);
     const podeAnexar = u.perfil === 'ALUNO' && STATUS_ANEXO_EDITAVEL.includes(s.status);
     const veParecer = u.perfil !== 'ALUNO';
 
     app.innerHTML = `
-        <p><a class="voltar" href="#/">← Voltar para a lista</a></p>
-        <div class="cabecalho">
-            <div>
-                <h1>${esc(s.disciplinaDestino)}</h1>
-                <span class="muted">${esc(s.curso)} · ${esc(s.cargaHorariaDestino)} h</span>
-            </div>
-            ${statusBadge(s.status)}
-        </div>
+        <a class="voltar" href="#/">${ICONES.voltar} Voltar para a lista</a>
 
         <section class="card">
-            <h2>Ações disponíveis</h2>
+            <div class="cabecalho-detalhe">
+                <div>
+                    <p class="sobretitulo">${esc(s.curso)} · ${esc(s.cargaHorariaDestino)} h</p>
+                    <h2>${esc(s.disciplinaDestino)}</h2>
+                    <span class="muted pequeno">Atualizada em ${data(s.atualizadoEm)}</span>
+                </div>
+                ${statusBadge(s.status)}
+            </div>
             ${acoes.length ? `
-                <div class="campo">
+                <div class="campo" style="margin-top:1.25rem">
                     <label for="obs">Observação (opcional)</label>
                     <textarea id="obs" rows="2" maxlength="2000" placeholder="Registrada no histórico junto com a ação"></textarea>
                 </div>
                 <div class="acoes">
                     ${acoes.map(a => `<button type="button" class="btn ${a.perigo ? 'btn-perigo' : ''}" data-acao="${a.acao}">${esc(a.rotulo)}</button>`).join('')}
                 </div>`
-            : '<p class="muted">Nenhuma ação disponível para o seu perfil neste status.</p>'}
+            : '<p class="muted" style="margin:1rem 0 0">Nenhuma ação disponível para o seu perfil neste status.</p>'}
         </section>
 
-        ${veParecer ? '<section class="card parecer" id="parecer"></section>' : ''}
+        ${veParecer ? '<section class="card destaque parecer" id="parecer"></section>' : ''}
 
         <div class="grade">
             <section class="card">
-                <h2>Dados da solicitação</h2>
+                <h3>Dados da solicitação</h3>
                 <dl class="dados">
                     <dt>Aluno</dt><dd>${esc(nomeUsuario(s.alunoId))}</dd>
                     <dt>Curso</dt><dd>${esc(s.curso)}</dd>
                     <dt>Disciplina</dt><dd>${esc(s.disciplinaDestino)}</dd>
                     <dt>Carga horária</dt><dd>${esc(s.cargaHorariaDestino)} h</dd>
                     <dt>Criada em</dt><dd>${data(s.criadoEm)}</dd>
-                    <dt>Atualizada em</dt><dd>${data(s.atualizadoEm)}</dd>
                 </dl>
-                <h3 style="margin-top:1rem">Disciplinas cursadas</h3>
+                <h3 style="margin-top:1.5rem">Disciplinas cursadas <span class="contador">${s.disciplinas.length}</span></h3>
                 <div class="tabela-wrap">
                     <table class="responsiva">
                         <thead><tr><th>Disciplina</th><th>Instituição</th><th>Carga</th></tr></thead>
@@ -311,43 +388,43 @@ async function telaDetalhe(id) {
                     </table>
                 </div>
                 ${s.preDiagnostico ? `
-                    <h3 style="margin-top:1rem">Pré-diagnóstico</h3>
+                    <h3 style="margin-top:1.5rem">Pré-diagnóstico</h3>
                     <p class="pequeno">Carga: <strong>${esc(s.preDiagnostico.percentualCarga ?? '—')}%</strong>
                     · Conteúdo: <strong>${esc(s.preDiagnostico.percentualConteudo ?? '—')}%</strong></p>
                     ${s.preDiagnostico.justificativa ? `<p class="pequeno muted">${esc(s.preDiagnostico.justificativa)}</p>` : ''}` : ''}
             </section>
 
             <section class="card">
-                <h2>Histórico de status</h2>
+                <h3>Histórico de status</h3>
                 ${historico.length ? `
                     <ol class="linha-tempo">
                         ${historico.map(h => `
                             <li>
                                 ${h.statusAnterior ? statusBadge(h.statusAnterior) + ' → ' : ''}${statusBadge(h.statusNovo)}
                                 <div class="pequeno muted">${data(h.criadoEm)} · ${esc(nomeUsuario(h.responsavelId))}</div>
-                                ${h.observacao ? `<div class="pequeno obs">“${esc(h.observacao)}”</div>` : ''}
+                                ${h.observacao ? `<div class="obs">“${esc(h.observacao)}”</div>` : ''}
                             </li>`).join('')}
                     </ol>` : '<p class="muted">Sem movimentações ainda.</p>'}
             </section>
         </div>
 
-        <section class="card" style="margin-top:1rem">
-            <h2>Anexos</h2>
+        <section class="card" style="margin-top:1.25rem">
+            <h3>Anexos <span class="contador">${s.anexos.length}</span></h3>
             ${s.anexos.length ? `
                 <ul class="anexos">
                     ${s.anexos.map(a => `
                         <li>
-                            <span>📄 ${esc(a.nomeArquivo)} <span class="muted pequeno">${tamanho(a.tamanho)} · ${data(a.criadoEm)}</span></span>
+                            <span class="anexo-nome">${ICONES.pdf} <span>${esc(a.nomeArquivo)}
+                                <span class="muted pequeno">· ${tamanho(a.tamanho)} · ${data(a.criadoEm)}</span></span></span>
                             <span class="acoes-anexo">
-                                ${u.perfil === 'ALUNO' || u.perfil === 'SERVIDOR' || u.perfil === 'PROFESSOR'
-                                    ? `<button type="button" class="btn btn-sec btn-mini" data-baixar="${esc(a.id)}" data-nome="${esc(a.nomeArquivo)}">Baixar</button>` : ''}
+                                <button type="button" class="btn btn-sec btn-mini" data-baixar="${esc(a.id)}" data-nome="${esc(a.nomeArquivo)}">Baixar</button>
                                 ${podeAnexar ? `<button type="button" class="btn btn-perigo btn-mini" data-remover="${esc(a.id)}">Remover</button>` : ''}
                             </span>
                         </li>`).join('')}
                 </ul>` : '<p class="muted">Nenhum anexo.</p>'}
             ${podeAnexar ? `
                 <form id="form-anexo" class="acoes">
-                    <input type="file" id="arquivo" accept="application/pdf,.pdf" required style="flex:1;min-width:200px">
+                    <input type="file" id="arquivo" accept="application/pdf,.pdf" required aria-label="Arquivo PDF" style="flex:1;min-width:200px">
                     <button type="submit" class="btn">Enviar PDF</button>
                 </form>
                 <p class="muted pequeno">Somente PDF, até 5 MB.</p>` : ''}
@@ -447,11 +524,11 @@ async function carregarParecer(id, tentativas = 0) {
         const sim = Math.max(0, Math.min(100, p.similaridade ?? 0));
         const faixa = sim < 50 ? 'baixa' : sim < 75 ? 'media' : '';
         corpo = `
-            <p class="rec rec-${esc(p.recomendacao)}">${esc(RECOMENDACAO_ROTULO[p.recomendacao] || p.recomendacao || '—')}</p>
+            <span class="rec rec-${esc(p.recomendacao)}">${esc(RECOMENDACAO_ROTULO[p.recomendacao] || p.recomendacao || '—')}</span>
             <div class="pequeno">Similaridade de conteúdo: <strong>${sim}%</strong></div>
-            <div class="barra ${faixa}" role="progressbar" aria-valuenow="${sim}" aria-valuemin="0" aria-valuemax="100"><span style="width:${sim}%"></span></div>
+            <div class="barra ${faixa}" role="progressbar" aria-valuenow="${sim}" aria-valuemin="0" aria-valuemax="100" aria-label="Similaridade"><span style="width:${sim}%"></span></div>
             <p>${esc(p.justificativa || '')}</p>
-            <p class="muted pequeno">Gerado em ${data(p.geradoEm)}. Sugestão de apoio: a decisão é do coordenador.</p>`;
+            <p class="muted pequeno" style="margin-bottom:0">Gerado em ${data(p.geradoEm)}. Sugestão de apoio: a decisão é do coordenador.</p>`;
     }
     card.innerHTML = cabecalhoParecer() + corpo;
     const btn = card.querySelector('#btn-regerar');
@@ -468,9 +545,9 @@ async function carregarParecer(id, tentativas = 0) {
 }
 
 function cabecalhoParecer() {
-    return `<div class="cabecalho" style="margin-bottom:.5rem">
-                <h2 style="margin:0">🤖 Pré-parecer da IA</h2>
-                <button type="button" class="btn btn-sec btn-mini" id="btn-regerar">↻ Regerar</button>
+    return `<div class="card-cab">
+                <h3>${ICONES.ia} Pré-parecer da IA</h3>
+                <button type="button" class="btn btn-sec btn-mini" id="btn-regerar">${ICONES.regerar} Regerar</button>
             </div>`;
 }
 
@@ -500,20 +577,20 @@ function linhaDisciplina() {
 }
 
 function telaNova() {
+    titulo('Nova solicitação');
     app.innerHTML = `
-        <p><a class="voltar" href="#/">← Voltar para a lista</a></p>
-        <h1>Nova solicitação de aproveitamento</h1>
+        <a class="voltar" href="#/">${ICONES.voltar} Voltar para a lista</a>
         <form id="form-nova" class="card">
-            <h2>Disciplina que deseja aproveitar</h2>
+            <h3>Disciplina que deseja aproveitar</h3>
             <div class="campos-2">
                 <div class="campo"><label for="curso">Curso</label><input id="curso" required value="ADS"></div>
                 <div class="campo"><label for="disciplinaDestino">Disciplina destino</label><input id="disciplinaDestino" required placeholder="Ex.: Banco de Dados"></div>
                 <div class="campo"><label for="cargaHorariaDestino">Carga (h)</label><input id="cargaHorariaDestino" type="number" min="1" required></div>
             </div>
-            <h2 style="margin-top:.5rem">Disciplinas já cursadas</h2>
+            <h3 style="margin-top:.75rem">Disciplinas já cursadas</h3>
             <div id="disciplinas">${linhaDisciplina()}</div>
             <button type="button" class="btn btn-sec btn-mini" id="add-disc">+ Adicionar disciplina</button>
-            <div class="acoes" style="margin-top:1.25rem">
+            <div class="acoes" style="margin-top:1.5rem">
                 <button type="submit" class="btn">Criar rascunho</button>
                 <a class="btn btn-sec" href="#/">Cancelar</a>
             </div>
