@@ -55,6 +55,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -162,7 +163,7 @@ class AproveitamentoControllerTest {
     void detalharRetorna200() throws Exception {
         Solicitacao s = solicitacao(aluno);
         when(solicitacoes.buscar(solicitacaoId)).thenReturn(s);
-        when(solicitacoes.detalhar(solicitacaoId))
+        when(solicitacoes.detalhar(eq(solicitacaoId), any(), any()))
                 .thenReturn(SolicitacaoDetalhe.de(s, List.of(), List.of(), null));
 
         mvc.perform(como(get("/aproveitamentos/{id}", solicitacaoId), aluno, Perfil.ALUNO))
@@ -178,14 +179,14 @@ class AproveitamentoControllerTest {
 
         mvc.perform(como(get("/aproveitamentos/{id}", solicitacaoId), aluno, Perfil.ALUNO))
                 .andExpect(status().isForbidden());
-        verify(solicitacoes, never()).detalhar(any());
+        verify(solicitacoes, never()).detalhar(any(), any(), any());
     }
 
     @Test
     void detalharPermiteServidorVerSolicitacaoDeQualquerAluno() throws Exception {
         Solicitacao s = solicitacao(outroAluno);
         when(solicitacoes.buscar(solicitacaoId)).thenReturn(s);
-        when(solicitacoes.detalhar(solicitacaoId))
+        when(solicitacoes.detalhar(eq(solicitacaoId), any(), any()))
                 .thenReturn(SolicitacaoDetalhe.de(s, List.of(), List.of(), null));
 
         mvc.perform(como(get("/aproveitamentos/{id}", solicitacaoId), servidor, Perfil.SERVIDOR))
@@ -199,6 +200,81 @@ class AproveitamentoControllerTest {
 
         mvc.perform(como(get("/aproveitamentos/{id}", solicitacaoId), aluno, Perfil.ALUNO))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void detalharExpoePodeDecidirDoProfessor() throws Exception {
+        UUID professor = UUID.randomUUID();
+        Solicitacao s = solicitacao(aluno);
+        when(solicitacoes.buscar(solicitacaoId)).thenReturn(s);
+        when(solicitacoes.detalhar(solicitacaoId, professor, Perfil.PROFESSOR))
+                .thenReturn(SolicitacaoDetalhe.de(s, List.of(), List.of(), null, true));
+
+        mvc.perform(como(get("/aproveitamentos/{id}", solicitacaoId), professor, Perfil.PROFESSOR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.podeDecidir").value(true));
+    }
+
+    @Test
+    void detalharPodeDecidirFalsoParaProfessorNaoCoordenador() throws Exception {
+        UUID professor = UUID.randomUUID();
+        Solicitacao s = solicitacao(aluno);
+        when(solicitacoes.buscar(solicitacaoId)).thenReturn(s);
+        when(solicitacoes.detalhar(solicitacaoId, professor, Perfil.PROFESSOR))
+                .thenReturn(SolicitacaoDetalhe.de(s, List.of(), List.of(), null, false));
+
+        mvc.perform(como(get("/aproveitamentos/{id}", solicitacaoId), professor, Perfil.PROFESSOR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.podeDecidir").value(false));
+    }
+
+    // ---------- PUT atualizar ----------
+
+    private MockHttpServletRequestBuilder putAtualizar() {
+        return put("/aproveitamentos/{id}", solicitacaoId).contentType(MediaType.APPLICATION_JSON).content("""
+                {"disciplinaDestinoId":"%s",
+                 "disciplinas":[{"nome":"BD I","instituicao":"UFLA","cargaHoraria":40,"ementa":"modelagem sql"}]}
+                """.formatted(UUID.randomUUID()));
+    }
+
+    @Test
+    void atualizarPeloAlunoDonoRetorna200() throws Exception {
+        Solicitacao s = solicitacao(aluno);
+        when(solicitacoes.buscar(solicitacaoId)).thenReturn(s);
+        when(solicitacoes.atualizar(eq(solicitacaoId), any())).thenReturn(s);
+
+        mvc.perform(como(putAtualizar(), aluno, Perfil.ALUNO))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(solicitacaoId.toString()));
+        verify(solicitacoes).atualizar(eq(solicitacaoId), any());
+    }
+
+    @Test
+    void atualizarDeOutroAlunoRetorna403() throws Exception {
+        when(solicitacoes.buscar(solicitacaoId)).thenReturn(solicitacao(outroAluno));
+
+        mvc.perform(como(putAtualizar(), aluno, Perfil.ALUNO)).andExpect(status().isForbidden());
+        verify(solicitacoes, never()).atualizar(any(), any());
+    }
+
+    @Test
+    void atualizarPorServidorRetorna403() throws Exception {
+        mvc.perform(como(putAtualizar(), servidor, Perfil.SERVIDOR)).andExpect(status().isForbidden());
+        verify(solicitacoes, never()).atualizar(any(), any());
+    }
+
+    @Test
+    void atualizarSolicitacaoEnviadaRetorna409() throws Exception {
+        when(solicitacoes.buscar(solicitacaoId)).thenReturn(solicitacao(aluno));
+        when(solicitacoes.atualizar(eq(solicitacaoId), any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Solicitacao so pode ser editada"));
+
+        mvc.perform(como(putAtualizar(), aluno, Perfil.ALUNO)).andExpect(status().isConflict());
+    }
+
+    @Test
+    void atualizarSemTokenRetorna401() throws Exception {
+        mvc.perform(putAtualizar()).andExpect(status().isUnauthorized());
     }
 
     // ---------- GET lista ----------

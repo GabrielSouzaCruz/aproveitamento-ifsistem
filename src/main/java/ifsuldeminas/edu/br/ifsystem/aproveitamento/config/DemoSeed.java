@@ -16,7 +16,11 @@ import ifsuldeminas.edu.br.ifsystem.usuario.domain.StatusUsuario;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Profile;
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.context.annotation.Conditional;
+import org.springframework.core.env.Profiles;
+import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -26,7 +30,8 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * Dados de exemplo para demonstracao (profiles "demo" e "render").
+ * Dados de exemplo para demonstracao. So roda com o profile "demo" ou com {@code DEMO_SEED=true}
+ * (propriedade {@code app.demo-seed}); em producao (profile "render") o padrao e desligado.
  * <p>
  * Usuarios e solicitacoes sao inseridos via JDBC para terem UUIDs fixos (as entidades usam
  * {@code @GeneratedValue}); os avancos de status passam pelo {@link FluxoStatusService}, gerando
@@ -34,7 +39,7 @@ import java.util.UUID;
  * Idempotente: se o aluno demo ja existe, nada e feito.
  */
 @Component
-@Profile({"demo", "render"})
+@Conditional(DemoSeed.Ativado.class)
 public class DemoSeed implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(DemoSeed.class);
 
@@ -63,6 +68,16 @@ public class DemoSeed implements CommandLineRunner {
     static final String EMENTA_REDES = "Fundamentos de redes de computadores. Modelo OSI e arquitetura TCP/IP. "
             + "Enderecamento IP, roteamento e protocolos de transporte. Servicos de rede, DNS e HTTP. "
             + "Seguranca basica em redes.";
+
+    /** Liga o seed: profile "demo" ou app.demo-seed=true (variavel DEMO_SEED). */
+    static class Ativado implements Condition {
+        @Override
+        public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            var env = context.getEnvironment();
+            return env.acceptsProfiles(Profiles.of("demo"))
+                    || env.getProperty("app.demo-seed", Boolean.class, false);
+        }
+    }
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;

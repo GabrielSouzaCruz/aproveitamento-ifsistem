@@ -31,7 +31,7 @@ public class SecurityConfig {
                 .headers(h -> h.frameOptions(f -> f.sameOrigin()))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**", "/error",
+                        .requestMatchers("/auth/**", "/error", "/health",
                                 "/", "/index.html", "/login.html", "/app.js", "/login.js", "/style.css",
                                 "/js/**", "/fonts/**", "/img/**", "/favicon.ico",
                                 "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()

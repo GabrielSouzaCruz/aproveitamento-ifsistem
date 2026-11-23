@@ -64,7 +64,7 @@ Roteiro para apresentar a aplicação sem Docker: o profile `demo` usa H2 em arq
 2. Abrir o Swagger: http://localhost:8080/swagger-ui.html
 3. (Opcional) Console H2: http://localhost:8080/h2-console. JDBC URL `jdbc:h2:file:./data/demo`, usuário `sa`, senha vazia.
 
-O login é real: abra http://localhost:8080 e entre com CPF e senha (ou crie uma conta de aluno em "Criar conta"). A senha dos usuários demo é `demo1234` (só nos profiles `demo` e `render`).
+O login é real: abra http://localhost:8080 e entre com CPF e senha (ou crie uma conta de aluno em "Criar conta"). A senha dos usuários demo é `demo1234` (só quando o seed demo está ligado: profile `demo` ou `DEMO_SEED=true`).
 
 | Perfil | Nome | CPF | Observação |
 |---|---|---|---|
@@ -88,7 +88,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/aproveitamentos
 
 - `POST /auth/cadastro` (público): cria sempre um ALUNO. `POST /auth/login`: devolve `{token, expiraEm, usuario}`; o token (JWT HS256) vale 8 h.
 - Secretaria (perfil `SERVIDOR`): `POST /usuarios` (PROFESSOR ou SERVIDOR), `GET /usuarios?perfil=`, `PATCH /usuarios/{id}/ativo`.
-- Variáveis: `JWT_SECRET` (obrigatória no profile `render`, mínimo 32 caracteres), `ADMIN_CPF`, `ADMIN_SENHA` e `ADMIN_EMAIL` (opcional). Se não existir nenhum SERVIDOR e `ADMIN_CPF`/`ADMIN_SENHA` estiverem definidos, a conta "Secretaria" é criada na inicialização.
+- Variáveis: `JWT_SECRET` (obrigatória no profile `render`, mínimo 32 caracteres), `ADMIN_CPF`, `ADMIN_SENHA` e `ADMIN_EMAIL` (opcional). Se `ADMIN_CPF`/`ADMIN_SENHA` estiverem definidos e não existir usuário com esse CPF, a conta "Secretaria" (SERVIDOR) é criada na inicialização, mesmo que já existam outros servidores.
 
 ### Postgres (opcional)
 
@@ -98,9 +98,24 @@ docker compose up -d
 DB_URL=jdbc:postgresql://localhost:5432/aproveitamento DB_USERNAME=aproveitamento DB_PASSWORD=aproveitamento ./mvnw spring-boot:run
 ```
 
+## Produção
+
+Profile `render` (Postgres externo, schema via Flyway). Variáveis de ambiente:
+
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | sim | Conexão JDBC com o Postgres (ex.: `jdbc:postgresql://host:5432/postgres`). |
+| `JWT_SECRET` | sim | Segredo do JWT, mínimo 32 caracteres. Sem ele a aplicação não sobe. |
+| `ADMIN_CPF`, `ADMIN_SENHA` | recomendada | Criam a conta da secretaria (SERVIDOR) na subida, se ainda não existir usuário com esse CPF. `ADMIN_EMAIL` é opcional. |
+| `DEMO_SEED` | não | `true` popula usuários e solicitações de demonstração (senha `demo1234`). Padrão no profile `render`: `false`. |
+
+**Desligar a demo:** deixe `DEMO_SEED` ausente ou `false` (é o padrão no `render.yaml`). O seed só roda com o profile `demo` ou `DEMO_SEED=true`. Desligar não apaga dados já semeados: se a demo já rodou em um banco de produção, remova os usuários demo (CPFs `52998224725`, `11144477735`, `12345678909`) e suas solicitações, ou troque a senha deles, pois ela é pública.
+
+**Keep-alive:** `GET /health` é público e responde `200 {"status":"ok"}` sem consultar o banco; use-o em pings para evitar a hibernação do plano free.
+
 ## Deploy
 
-Deploy no Render (Blueprint) usando o profile `render`, com Postgres externo (Supabase). O profile `render` também executa o seed de demonstração (idempotente) na primeira subida.
+Deploy no Render (Blueprint) usando o profile `render`, com Postgres externo (Supabase). O seed de demonstração **não** roda por padrão no profile `render`; só com `DEMO_SEED=true` (veja "Produção").
 
 1. No Supabase, em **Connect**, copie a string do **Session pooler** (porta `5432`, compatível com IPv4) e converta para o formato JDBC, com `?sslmode=require`:
    ```
@@ -109,7 +124,7 @@ Deploy no Render (Blueprint) usando o profile `render`, com Postgres externo (Su
    DB_PASSWORD=<senha do banco>
    ```
 2. No Render, clique em **New > Blueprint**, selecione este repositório (o `render.yaml` na raiz é lido automaticamente) e preencha as variáveis do banco (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) e da conta inicial da secretaria (`ADMIN_CPF`, `ADMIN_SENHA`, opcional `ADMIN_EMAIL`). `JWT_SECRET` é gerado pelo Blueprint.
-3. Após o build, a aplicação responde em `https://<servico>.onrender.com` (Swagger em `/swagger-ui.html`; health check em `/v3/api-docs`). No plano free o serviço hiberna após inatividade e a primeira requisição é lenta.
+3. Após o build, a aplicação responde em `https://<servico>.onrender.com` (Swagger em `/swagger-ui.html`; health check e keep-alive em `/health`). No plano free o serviço hiberna após inatividade e a primeira requisição é lenta.
 
 ## Migrações de banco (Flyway)
 

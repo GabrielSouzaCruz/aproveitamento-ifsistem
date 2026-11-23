@@ -105,6 +105,14 @@ public class Solicitacao {
         return atualizadoEm;
     }
 
+    /** Troca o destino, recopiando nome, curso e carga horaria do catalogo. */
+    public void alterarDestino(DisciplinaCurso destino) {
+        this.curso = destino.getCurso().getNome();
+        this.disciplinaDestino = destino.getNome();
+        this.cargaHorariaDestino = destino.getCargaHoraria();
+        this.disciplinaCursoDestino = destino;
+    }
+
     public void alterarStatus(StatusSolicitacao status) {
         this.status = status;
     }

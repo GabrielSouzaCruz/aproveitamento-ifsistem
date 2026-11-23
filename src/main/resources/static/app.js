@@ -248,6 +248,7 @@ const UUID_RE = '([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})'
 /** Rotas por hash. As telas especificas de cada perfil ficam em js/aluno.js, js/secretaria.js e js/professor.js. */
 const ROTAS = [
     { re: new RegExp('^/s/' + UUID_RE + '$', 'i'), chave: 'detalhe', tela: id => telaDetalhe(id) },
+    { re: new RegExp('^/s/' + UUID_RE + '/editar$', 'i'), chave: 'detalhe', perfis: ['ALUNO'], tela: id => telaNova(id) },
     { re: /^\/nova$/, chave: 'nova', perfis: ['ALUNO'], tela: () => telaNova() },
     { re: /^\/cursos$/, chave: 'cursos', perfis: ['SERVIDOR'], tela: () => telaCursos() },
     { re: new RegExp('^/cursos/' + UUID_RE + '$', 'i'), chave: 'cursos', perfis: ['SERVIDOR'], tela: id => telaDisciplinas(id) },
@@ -449,7 +450,9 @@ async function telaDetalhe(id) {
     titulo('Solicitação de aproveitamento');
     app.innerHTML = '<p class="muted carregando">Carregando solicitação</p>';
     const [s, historico] = await Promise.all([api('/' + id), api('/' + id + '/historico')]);
-    const acoes = acoesDisponiveis(u.perfil, s.status);
+    // Professor so decide nas solicitacoes dos cursos que coordena (podeDecidir vem do backend).
+    const acoes = u.perfil === 'PROFESSOR' && !s.podeDecidir ? [] : acoesDisponiveis(u.perfil, s.status);
+    const podeEditar = u.perfil === 'ALUNO' && STATUS_ANEXO_EDITAVEL.includes(s.status);
     const podeAnexar = u.perfil === 'ALUNO' && STATUS_ANEXO_EDITAVEL.includes(s.status);
     const veParecer = u.perfil !== 'ALUNO';
 
@@ -465,6 +468,7 @@ async function telaDetalhe(id) {
                 </div>
                 ${statusBadge(s.status)}
             </div>
+            ${podeEditar ? `<div class="acoes" style="margin-top:1rem"><a class="btn btn-sec" href="#/s/${esc(id)}/editar">Editar</a></div>` : ''}
             ${acoes.length ? `
                 <div class="campo" style="margin-top:1.25rem">
                     <label for="obs">Observação ${acoes.some(a => a.acao === 'devolver-pendencia') ? '(obrigatória ao devolver pendência)' : '(opcional)'}</label>
