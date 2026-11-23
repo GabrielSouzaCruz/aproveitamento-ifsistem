@@ -2,6 +2,7 @@ package ifsuldeminas.edu.br.ifsystem.aproveitamento.api;
 
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Anexo;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.DisciplinaCursada;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.DisciplinaCurso;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.HistoricoStatus;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.ParecerIa;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.PreDiagnostico;
@@ -78,17 +79,20 @@ public final class AproveitamentoDtos {
         }
     }
 
-    /** {@code preDiagnostico} e nulo quando a solicitacao ainda nao tem pre-diagnostico. */
-    public record SolicitacaoDetalhe(UUID id, UUID alunoId, String curso, String disciplinaDestino,
-                                     Integer cargaHorariaDestino, StatusSolicitacao status,
+    /** {@code cursoId} e {@code ementaDestino} sao nulos nas solicitacoes anteriores ao catalogo.
+     *  {@code preDiagnostico} e nulo quando a solicitacao ainda nao tem pre-diagnostico. */
+    public record SolicitacaoDetalhe(UUID id, UUID alunoId, String curso, UUID cursoId, String disciplinaDestino,
+                                     Integer cargaHorariaDestino, String ementaDestino, StatusSolicitacao status,
                                      OffsetDateTime criadoEm, OffsetDateTime atualizadoEm,
                                      List<DisciplinaCursadaResposta> disciplinas,
                                      List<AnexoResposta> anexos,
                                      PreDiagnosticoResposta preDiagnostico) {
         public static SolicitacaoDetalhe de(Solicitacao s, List<DisciplinaCursada> disciplinas,
                                             List<Anexo> anexos, PreDiagnostico preDiagnostico) {
-            return new SolicitacaoDetalhe(s.getId(), s.getAlunoId(), s.getCurso(), s.getDisciplinaDestino(),
-                    s.getCargaHorariaDestino(), s.getStatus(), s.getCriadoEm(), s.getAtualizadoEm(),
+            DisciplinaCurso destino = s.getDisciplinaCursoDestino();
+            return new SolicitacaoDetalhe(s.getId(), s.getAlunoId(), s.getCurso(),
+                    destino == null ? null : destino.getCurso().getId(), s.getDisciplinaDestino(),
+                    s.getCargaHorariaDestino(), destino == null ? null : destino.getEmenta(), s.getStatus(), s.getCriadoEm(), s.getAtualizadoEm(),
                     disciplinas.stream().map(DisciplinaCursadaResposta::de).toList(),
                     anexos.stream().map(AnexoResposta::de).toList(),
                     preDiagnostico == null ? null : PreDiagnosticoResposta.de(preDiagnostico));

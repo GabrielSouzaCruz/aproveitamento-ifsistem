@@ -121,6 +121,12 @@ public class CatalogoService {
 
     // ---------- Coordenadores ----------
 
+    @Transactional(readOnly = true)
+    public List<Coordenador> listarCoordenadores(UUID cursoId) {
+        buscarCurso(cursoId);
+        return coordenadores.findByCursoId(cursoId);
+    }
+
     @Transactional
     public Coordenador adicionarCoordenador(UUID cursoId, UUID professorId) {
         Curso curso = buscarCurso(cursoId);

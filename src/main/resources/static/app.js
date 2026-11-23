@@ -50,6 +50,27 @@ const ICONES = {
     regerar: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>'
 };
 
+ICONES.livro = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>';
+ICONES.pessoas = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.5A6.5 6.5 0 0 1 21.5 20"/></svg>';
+ICONES.chave = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 7l3 3"/></svg>';
+
+/** Menu por perfil: `chave` casa com a chave da rota ativa (ver ROTAS). */
+const MENUS = {
+    ALUNO: [
+        { chave: 'inicio', href: '#/', rotulo: 'Minhas solicitações', icone: ICONES.lista },
+        { chave: 'nova', href: '#/nova', rotulo: 'Nova solicitação', icone: ICONES.mais }
+    ],
+    SERVIDOR: [
+        { chave: 'inicio', href: '#/', rotulo: 'Fila de solicitações', icone: ICONES.lista },
+        { chave: 'cursos', href: '#/cursos', rotulo: 'Cursos e disciplinas', icone: ICONES.livro },
+        { chave: 'coordenadores', href: '#/coordenadores', rotulo: 'Coordenadores', icone: ICONES.chave },
+        { chave: 'usuarios', href: '#/usuarios', rotulo: 'Usuários', icone: ICONES.pessoas }
+    ],
+    PROFESSOR: [
+        { chave: 'inicio', href: '#/', rotulo: 'Para analisar', icone: ICONES.lista }
+    ]
+};
+
 const app = document.getElementById('app');
 let pollingParecer = null;
 
@@ -87,38 +108,55 @@ class ErroApi extends Error {
     }
 }
 
-function mensagemAmigavel(status, acao) {
+/** Mensagens amigaveis por status; `ctx` refina o texto (acao, catalogo, coordenador, usuario, solicitacao). */
+function mensagemAmigavel(status, ctx) {
+    const perfil = (usuarioAtual() || {}).perfil;
     switch (status) {
-        case 400: return 'Dados inválidos. Confira os campos e tente novamente.';
+        case 400: return ctx === 'usuario'
+            ? 'Dados inválidos. Confira o CPF, o e-mail institucional e a senha (mínimo de 8 caracteres).'
+            : 'Dados inválidos. Confira os campos e tente novamente.';
         case 401: return 'Sessão expirada. Entre novamente.';
-        case 403: return acao
-            ? 'Você não tem permissão para esta ação com o seu perfil.'
+        case 403: return ctx === 'acao'
+            ? (perfil === 'PROFESSOR'
+                ? 'Você não coordena o curso desta solicitação, então não pode executar esta ação.'
+                : 'Você não tem permissão para esta ação com o seu perfil.')
             : 'Acesso negado para o seu perfil.';
-        case 404: return 'Registro não encontrado.';
-        case 409: return acao
-            ? 'Esta ação não é permitida no status atual da solicitação. A tela foi atualizada.'
-            : 'Operação não permitida no status atual da solicitação.';
+        case 404: return 'Registro não encontrado. Ele pode ter sido removido.';
+        case 409:
+            if (ctx === 'acao') return 'Esta ação não é permitida no status atual da solicitação. A tela foi atualizada.';
+            if (ctx === 'catalogo') return 'Já existe um registro com este código.';
+            if (ctx === 'coordenador') return 'Este professor já coordena o curso.';
+            if (ctx === 'usuario') return 'CPF, e-mail ou matrícula já cadastrados.';
+            return 'Operação não permitida no status atual da solicitação.';
         case 413: return 'Arquivo maior que o limite de 5 MB.';
         case 415: return 'Apenas arquivos PDF são aceitos.';
+        case 422: return ctx === 'coordenador'
+            ? 'Só é possível vincular um professor ativo.'
+            : 'A disciplina destino não existe mais ou foi inativada. Escolha outra.';
         default: return 'Não foi possível concluir a operação (erro ' + status + ').';
     }
 }
 
-async function api(caminho, opcoes = {}) {
+/** Chamada autenticada a qualquer endpoint; 401 devolve ao login. */
+async function http(caminho, opcoes = {}) {
     const headers = Object.assign({ 'Authorization': 'Bearer ' + sessionStorage.getItem('token') }, opcoes.headers || {});
+    let corpo = opcoes.body;
     if (opcoes.json !== undefined) {
         headers['Content-Type'] = 'application/json';
-        opcoes.body = JSON.stringify(opcoes.json);
+        corpo = JSON.stringify(opcoes.json);
     }
-    const resp = await fetch(API + caminho, { method: opcoes.method || 'GET', headers, body: opcoes.body });
+    const resp = await fetch(caminho, { method: opcoes.method || 'GET', headers, body: corpo });
     if (!resp.ok) {
         if (resp.status === 401) { sair(); throw new ErroApi(401, mensagemAmigavel(401)); }
-        throw new ErroApi(resp.status, mensagemAmigavel(resp.status, opcoes.acao));
+        throw new ErroApi(resp.status, mensagemAmigavel(resp.status, opcoes.ctx || (opcoes.acao ? 'acao' : undefined)));
     }
     if (opcoes.blob) return resp.blob();
     const texto = await resp.text();
     return texto ? JSON.parse(texto) : null;
 }
+
+/** Atalho para /aproveitamentos. */
+const api = (caminho, opcoes) => http(API + caminho, opcoes);
 
 // ---------- Utilitarios de UI ----------
 
@@ -180,7 +218,7 @@ function erro(e) {
 
 // ---------- Moldura (menu lateral e barra do topo) ----------
 
-function montarMoldura(u, rota) {
+function montarMoldura(u, chaveRota) {
     document.body.classList.toggle('sem-sessao', !u);
     if (!u) return;
     document.getElementById('area-usuario').textContent = u.area;
@@ -191,11 +229,11 @@ function montarMoldura(u, rota) {
         { day: 'numeric', month: 'long', year: 'numeric' }) + ' • ' +
         new Date().toLocaleDateString('pt-BR', { weekday: 'long' });
 
-    const itens = [{ href: '#/', rotulo: 'Aproveitamentos', icone: ICONES.lista, ativo: rota !== 'nova' }];
-    if (u.perfil === 'ALUNO')
-        itens.push({ href: '#/nova', rotulo: 'Nova solicitação', icone: ICONES.mais, ativo: rota === 'nova' });
-    document.getElementById('menu').innerHTML = itens.map(i =>
-        `<a href="${i.href}" class="${i.ativo ? 'ativo' : ''}"${i.ativo ? ' aria-current="page"' : ''}>${i.icone}<span>${esc(i.rotulo)}</span></a>`).join('');
+    const itens = MENUS[u.perfil] || MENUS.ALUNO;
+    document.getElementById('menu').innerHTML = itens.map(i => {
+        const ativo = i.chave === chaveRota;
+        return `<a href="${i.href}" class="${ativo ? 'ativo' : ''}"${ativo ? ' aria-current="page"' : ''}>${i.icone}<span>${esc(i.rotulo)}</span></a>`;
+    }).join('');
 }
 
 function titulo(texto) {
@@ -205,20 +243,42 @@ function titulo(texto) {
 
 // ---------- Roteamento ----------
 
+const UUID_RE = '([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})';
+
+/** Rotas por hash. As telas especificas de cada perfil ficam em js/aluno.js, js/secretaria.js e js/professor.js. */
+const ROTAS = [
+    { re: new RegExp('^/s/' + UUID_RE + '$', 'i'), chave: 'detalhe', tela: id => telaDetalhe(id) },
+    { re: /^\/nova$/, chave: 'nova', perfis: ['ALUNO'], tela: () => telaNova() },
+    { re: /^\/cursos$/, chave: 'cursos', perfis: ['SERVIDOR'], tela: () => telaCursos() },
+    { re: new RegExp('^/cursos/' + UUID_RE + '$', 'i'), chave: 'cursos', perfis: ['SERVIDOR'], tela: id => telaDisciplinas(id) },
+    { re: /^\/coordenadores$/, chave: 'coordenadores', perfis: ['SERVIDOR'], tela: () => telaCoordenadores() },
+    { re: /^\/usuarios$/, chave: 'usuarios', perfis: ['SERVIDOR'], tela: () => telaUsuarios() }
+];
+
 async function rotear() {
     clearTimeout(pollingParecer);
     const u = usuarioAtual();
-    const hash = location.hash.replace(/^#/, '');
-    const detalhe = hash.match(/^\/s\/([0-9a-f-]{36})$/i);
-    const nova = hash === '/nova' && u && u.perfil === 'ALUNO';
-    montarMoldura(u, nova ? 'nova' : 'lista');
-    if (!u) return sair();
+    if (!u) { montarMoldura(null); return sair(); }
+    const hash = location.hash.replace(/^#/, '') || '/';
+    let rota = null, args = [];
+    for (const r of ROTAS) {
+        const m = hash.match(r.re);
+        if (m) { rota = r; args = m.slice(1); break; }
+    }
+    let avisoDaTela = null;
+    if (rota && rota.perfis && !rota.perfis.includes(u.perfil)) {
+        // Tela de outro perfil: mostra a tela inicial do usuario (sem novo hashchange, que apagaria o aviso).
+        history.replaceState(null, '', '#/');
+        rota = null;
+        avisoDaTela = 'Esta área não está disponível para o seu perfil.';
+    }
+    montarMoldura(u, rota ? rota.chave : 'inicio');
     try {
-        if (detalhe) await telaDetalhe(detalhe[1]);
-        else if (nova) telaNova();
+        if (rota) await rota.tela(...args);
         else await telaLista();
+        if (avisoDaTela) mostrarAviso(avisoDaTela);
     } catch (e) {
-        if (detalhe) navegar('#/', e instanceof ErroApi ? e.message : 'Falha de comunicação com o servidor.');
+        if (rota && rota.chave === 'detalhe') navegar('#/', e instanceof ErroApi ? e.message : 'Falha de comunicação com o servidor.');
         else erro(e);
     }
 }
@@ -228,11 +288,19 @@ let avisoPendente = null;
 
 function navegar(hash, mensagem, ok = false) {
     avisoPendente = mensagem ? [mensagem, ok] : null;
+    if (location.hash === hash) { rotear().then(exibirAvisoPendente); return; }
     location.hash = hash;
+}
+
+function exibirAvisoPendente() {
+    const pendente = avisoPendente;
+    avisoPendente = null;
+    if (pendente) mostrarAviso(...pendente);
 }
 
 window.addEventListener('hashchange', async () => {
     esconderAviso();
+    // Captura antes de rotear: se a rota falhar e chamar navegar(), o aviso e do proximo hashchange.
     const pendente = avisoPendente;
     avisoPendente = null;
     await rotear();
@@ -240,17 +308,38 @@ window.addEventListener('hashchange', async () => {
 });
 document.getElementById('btn-sair').onclick = sair;
 
-// ---------- Lista ----------
+// ---------- Lista (aluno: minhas solicitacoes; secretaria: fila; professor: para analisar) ----------
+
+const FILTRO_ACAO = '__acao';
+
+const TEXTOS_LISTA = {
+    ALUNO: { titulo: 'Minhas solicitações', numero: 'Minhas solicitações', cartao: 'Solicitações' },
+    SERVIDOR: { titulo: 'Fila de solicitações', numero: 'Solicitações no sistema', cartao: 'Fila' },
+    PROFESSOR: { titulo: 'Para analisar', numero: 'Solicitações dos meus cursos', cartao: 'Solicitações dos cursos que coordeno' }
+};
+
+/** Filtros escolhidos na fila; lembrados enquanto a pagina estiver aberta. */
+const filtrosLista = { status: FILTRO_ACAO, cursoId: '' };
 
 async function telaLista() {
     const u = usuarioAtual();
-    titulo(u.perfil === 'ALUNO' ? 'Minhas solicitações' : 'Aproveitamentos');
+    const txt = TEXTOS_LISTA[u.perfil] || TEXTOS_LISTA.ALUNO;
+    const comFiltros = u.perfil !== 'ALUNO';
+    titulo(txt.titulo);
     app.innerHTML = '<p class="muted carregando">Carregando solicitações</p>';
-    const lista = await api('');
-    lista.sort((a, b) => (b.atualizadoEm || '').localeCompare(a.atualizadoEm || ''));
 
-    const aguardando = lista.filter(s => acoesDisponiveis(u.perfil, s.status).length > 0).length;
-    const concluidas = lista.filter(s => STATUS_FINAIS.includes(s.status)).length;
+    const params = new URLSearchParams();
+    if (comFiltros && filtrosLista.status && filtrosLista.status !== FILTRO_ACAO) params.set('status', filtrosLista.status);
+    if (comFiltros && filtrosLista.cursoId) params.set('cursoId', filtrosLista.cursoId);
+    const [todas, cursos] = await Promise.all([
+        api(params.toString() ? '?' + params : ''),
+        comFiltros ? http('/cursos') : Promise.resolve([])
+    ]);
+    todas.sort((a, b) => (b.atualizadoEm || '').localeCompare(a.atualizadoEm || ''));
+    const aguardando = todas.filter(s => acoesDisponiveis(u.perfil, s.status).length > 0).length;
+    const concluidas = todas.filter(s => STATUS_FINAIS.includes(s.status)).length;
+    const lista = comFiltros && filtrosLista.status === FILTRO_ACAO
+        ? todas.filter(s => acoesDisponiveis(u.perfil, s.status).length > 0) : todas;
     const agora = new Date();
     const mes = agora.toLocaleDateString('pt-BR', { month: 'long' });
 
@@ -265,38 +354,92 @@ async function telaLista() {
         </section>
 
         <section class="numeros">
-            <div class="numero"><span>${u.perfil === 'ALUNO' ? 'Minhas solicitações' : 'Solicitações no sistema'}</span><strong>${lista.length}</strong></div>
+            <div class="numero"><span>${esc(txt.numero)}</span><strong>${todas.length}</strong></div>
             <div class="numero ${aguardando ? 'alerta' : ''}"><span>Aguardando sua ação</span><strong>${aguardando}</strong></div>
             <div class="numero realce"><span>Concluídas</span><strong>${concluidas}</strong></div>
         </section>
 
         <section class="card card-tabela">
             <div class="card-cab">
-                <h3>Solicitações <span class="contador">${lista.length}</span></h3>
+                <h3>${esc(txt.cartao)} <span class="contador">${lista.length}</span></h3>
+                ${comFiltros ? `
+                <div class="filtros">
+                    <label>Status
+                        <select id="filtro-status">
+                            <option value="${FILTRO_ACAO}">Aguardando minha ação</option>
+                            <option value="">Todos os status</option>
+                            ${Object.keys(STATUS_ROTULO).map(k => `<option value="${k}">${esc(STATUS_ROTULO[k])}</option>`).join('')}
+                        </select></label>
+                    <label>Curso
+                        <select id="filtro-curso">
+                            <option value="">Todos os cursos</option>
+                            ${cursos.map(c => `<option value="${esc(c.id)}">${esc(c.nome)}</option>`).join('')}
+                        </select></label>
+                </div>` : ''}
             </div>
             <div class="tabela-wrap">
                 <table class="responsiva">
-                    <thead><tr><th>Disciplina destino</th><th>Curso</th><th>Status</th><th>Atualizada em</th><th><span hidden>Abrir</span></th></tr></thead>
+                    <thead><tr><th>Disciplina destino</th><th>Curso</th><th>Status</th><th>Atualizada em</th><th><span hidden>Ações</span></th></tr></thead>
                     <tbody>
                         ${lista.length === 0 ? '<tr><td colspan="5" class="vazio">Nenhuma solicitação encontrada.</td></tr>' : ''}
-                        ${lista.map(s => `
-                            <tr class="clicavel" data-id="${esc(s.id)}" tabindex="0">
-                                <td data-rotulo="Disciplina"><strong>${esc(s.disciplinaDestino)}</strong>
-                                    ${acoesDisponiveis(u.perfil, s.status).length ? '<span class="sub">Aguarda sua ação</span>' : ''}</td>
-                                <td data-rotulo="Curso">${esc(s.curso)}</td>
-                                <td data-rotulo="Status">${statusBadge(s.status)}</td>
-                                <td data-rotulo="Atualizada">${data(s.atualizadoEm)}</td>
-                                <td class="seta">${ICONES.seta}</td>
-                            </tr>`).join('')}
+                        ${lista.map(s => linhaSolicitacao(u, s)).join('')}
                     </tbody>
                 </table>
             </div>
         </section>`;
+
+    if (comFiltros) {
+        const fs = document.getElementById('filtro-status'), fc = document.getElementById('filtro-curso');
+        fs.value = filtrosLista.status;
+        fc.value = filtrosLista.cursoId;
+        fs.onchange = () => { filtrosLista.status = fs.value; rotear(); };
+        fc.onchange = () => { filtrosLista.cursoId = fc.value; rotear(); };
+    }
     app.querySelectorAll('tr.clicavel').forEach(tr => {
         const abrir = () => { location.hash = '#/s/' + tr.dataset.id; };
         tr.onclick = abrir;
-        tr.onkeydown = e => { if (e.key === 'Enter') abrir(); };
+        tr.onkeydown = e => { if (e.key === 'Enter' && e.target === tr) abrir(); };
     });
+    app.querySelectorAll('[data-rapida]').forEach(b => b.onclick = e => {
+        e.stopPropagation();
+        acaoRapida(b.closest('tr').dataset.id, b.dataset.rapida, b);
+    });
+}
+
+function linhaSolicitacao(u, s) {
+    const acoes = acoesDisponiveis(u.perfil, s.status);
+    // Na fila da secretaria, conferir e devolver pendencia resolvem-se sem abrir o detalhe.
+    const rapidas = u.perfil === 'SERVIDOR'
+        ? acoes.filter(a => ['conferir', 'devolver-pendencia'].includes(a.acao)) : [];
+    return `
+        <tr class="clicavel" data-id="${esc(s.id)}" tabindex="0">
+            <td data-rotulo="Disciplina"><strong>${esc(s.disciplinaDestino)}</strong>
+                ${acoes.length ? '<span class="sub">Aguarda sua ação</span>' : ''}</td>
+            <td data-rotulo="Curso">${esc(s.curso)}</td>
+            <td data-rotulo="Status">${statusBadge(s.status)}</td>
+            <td data-rotulo="Atualizada">${data(s.atualizadoEm)}</td>
+            <td class="seta">${rapidas.length
+                ? `<span class="acoes-linha">${rapidas.map(a => `<button type="button" class="btn btn-mini ${a.perigo ? 'btn-perigo' : ''}" data-rapida="${a.acao}">${esc(a.acao === 'conferir' ? 'Conferir' : 'Devolver')}</button>`).join('')}</span>`
+                : ICONES.seta}</td>
+        </tr>`;
+}
+
+async function acaoRapida(id, acao, botao) {
+    let observacao = null;
+    if (acao === 'devolver-pendencia') {
+        observacao = (prompt('Motivo da pendência (o aluno verá no histórico):') || '').trim();
+        if (!observacao) return mostrarAviso('Informe o motivo da pendência para devolver a solicitação.');
+    }
+    botao.disabled = true;
+    try {
+        const r = await api(`/${id}/${acao}`, { method: 'POST', json: observacao ? { observacao } : {}, acao: true });
+        await telaLista();
+        mostrarAviso(`Solicitação atualizada. Novo status: ${STATUS_ROTULO[r.status] || r.status}.`, true);
+    } catch (e) {
+        erro(e);
+        if (e.status === 409 || e.status === 404) await telaLista().catch(() => {});
+        else botao.disabled = false;
+    }
 }
 
 // ---------- Detalhe ----------
@@ -324,7 +467,7 @@ async function telaDetalhe(id) {
             </div>
             ${acoes.length ? `
                 <div class="campo" style="margin-top:1.25rem">
-                    <label for="obs">Observação (opcional)</label>
+                    <label for="obs">Observação ${acoes.some(a => a.acao === 'devolver-pendencia') ? '(obrigatória ao devolver pendência)' : '(opcional)'}</label>
                     <textarea id="obs" rows="2" maxlength="2000" placeholder="Registrada no histórico junto com a ação"></textarea>
                 </div>
                 <div class="acoes">
@@ -334,6 +477,7 @@ async function telaDetalhe(id) {
         </section>
 
         ${veParecer ? '<section class="card destaque parecer" id="parecer"></section>' : ''}
+        ${veParecer ? blocoEmentas(s) : ''}
 
         <div class="grade">
             <section class="card">
@@ -345,21 +489,8 @@ async function telaDetalhe(id) {
                     <dt>Carga horária</dt><dd>${esc(s.cargaHorariaDestino)} h</dd>
                     <dt>Criada em</dt><dd>${data(s.criadoEm)}</dd>
                 </dl>
-                <h3 style="margin-top:1.5rem">Disciplinas cursadas <span class="contador">${s.disciplinas.length}</span></h3>
-                <div class="tabela-wrap">
-                    <table class="responsiva">
-                        <thead><tr><th>Disciplina</th><th>Instituição</th><th>Carga</th></tr></thead>
-                        <tbody>
-                            ${s.disciplinas.map(d => `
-                                <tr>
-                                    <td data-rotulo="Disciplina">${esc(d.nome)}</td>
-                                    <td data-rotulo="Instituição">${esc(d.instituicao)}</td>
-                                    <td data-rotulo="Carga">${esc(d.cargaHoraria)} h</td>
-                                </tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                ${s.preDiagnostico ? `
+                ${veParecer ? '' : blocoCursadasAluno(s)}
+                ${veParecer && s.preDiagnostico ? `
                     <h3 style="margin-top:1.5rem">Pré-diagnóstico</h3>
                     <p class="pequeno">Carga: <strong>${esc(s.preDiagnostico.percentualCarga ?? '—')}%</strong>
                     · Conteúdo: <strong>${esc(s.preDiagnostico.percentualConteudo ?? '—')}%</strong></p>
@@ -402,7 +533,7 @@ async function telaDetalhe(id) {
                 <p class="muted pequeno">Somente PDF, até 5 MB.</p>` : ''}
         </section>`;
 
-    app.querySelectorAll('[data-acao]').forEach(b => b.onclick = () => executarAcao(id, b.dataset.acao, b));
+    app.querySelectorAll('[data-acao]').forEach(b => b.onclick = () => executarAcao(id, b.dataset.acao, b, s));
     app.querySelectorAll('[data-baixar]').forEach(b => b.onclick = () => baixarAnexo(id, b.dataset.baixar, b.dataset.nome));
     app.querySelectorAll('[data-remover]').forEach(b => b.onclick = () => removerAnexo(id, b.dataset.remover));
     const formAnexo = document.getElementById('form-anexo');
@@ -410,9 +541,13 @@ async function telaDetalhe(id) {
     if (veParecer) carregarParecer(id);
 }
 
-async function executarAcao(id, acao, botao) {
+async function executarAcao(id, acao, botao, solicitacao) {
     const obs = document.getElementById('obs');
     const observacao = obs && obs.value.trim() ? obs.value.trim() : null;
+    if (acao === 'devolver-pendencia' && !observacao)
+        return mostrarAviso('Informe na observação o motivo da pendência para devolver a solicitação.');
+    if (acao === 'enviar' && solicitacao.anexos.length === 0
+        && !confirm('Nenhum PDF foi anexado. Enviar a solicitação mesmo assim?')) return;
     app.querySelectorAll('[data-acao]').forEach(b => b.disabled = true);
     try {
         const r = await api(`/${id}/${acao}`, { method: 'POST', json: observacao ? { observacao } : {}, acao: true });
@@ -535,75 +670,3 @@ async function regerarParecer(id, botao) {
         botao.disabled = false;
     }
 }
-
-// ---------- Nova solicitacao ----------
-
-function linhaDisciplina() {
-    return `
-        <div class="campos linha-disc">
-            <div><label>Disciplina cursada<input name="nome" required placeholder="Ex.: Banco de Dados I"></label></div>
-            <div><label>Instituição<input name="instituicao" required placeholder="Ex.: UNIFAL"></label></div>
-            <div><label>Carga (h)<input name="cargaHoraria" type="number" min="1" required></label></div>
-            <div><button type="button" class="btn btn-perigo btn-mini remover-disc" title="Remover disciplina" aria-label="Remover disciplina">×</button></div>
-        </div>`;
-}
-
-function telaNova() {
-    titulo('Nova solicitação');
-    app.innerHTML = `
-        <a class="voltar" href="#/">${ICONES.voltar} Voltar para a lista</a>
-        <form id="form-nova" class="card">
-            <h3>Disciplina que deseja aproveitar</h3>
-            <div class="campos-2">
-                <div class="campo"><label for="curso">Curso</label><input id="curso" required value="ADS"></div>
-                <div class="campo"><label for="disciplinaDestino">Disciplina destino</label><input id="disciplinaDestino" required placeholder="Ex.: Banco de Dados"></div>
-                <div class="campo"><label for="cargaHorariaDestino">Carga (h)</label><input id="cargaHorariaDestino" type="number" min="1" required></div>
-            </div>
-            <h3 style="margin-top:.75rem">Disciplinas já cursadas</h3>
-            <div id="disciplinas">${linhaDisciplina()}</div>
-            <button type="button" class="btn btn-sec btn-mini" id="add-disc">+ Adicionar disciplina</button>
-            <div class="acoes" style="margin-top:1.5rem">
-                <button type="submit" class="btn">Criar rascunho</button>
-                <a class="btn btn-sec" href="#/">Cancelar</a>
-            </div>
-            <p class="muted pequeno">A solicitação é criada como rascunho. Depois você pode anexar PDFs e enviar.</p>
-        </form>`;
-
-    const lista = document.getElementById('disciplinas');
-    const ligarRemover = () => lista.querySelectorAll('.remover-disc').forEach(b => b.onclick = () => {
-        if (lista.children.length > 1) b.closest('.linha-disc').remove();
-    });
-    ligarRemover();
-    document.getElementById('add-disc').onclick = () => {
-        lista.insertAdjacentHTML('beforeend', linhaDisciplina());
-        ligarRemover();
-    };
-
-    const form = document.getElementById('form-nova');
-    form.onsubmit = async e => {
-        e.preventDefault();
-        const valor = sel => form.querySelector(sel).value.trim();
-        const dados = {
-            alunoId: usuarioAtual().id,
-            curso: valor('#curso'),
-            disciplinaDestino: valor('#disciplinaDestino'),
-            cargaHorariaDestino: Number(valor('#cargaHorariaDestino')),
-            disciplinas: [...lista.querySelectorAll('.linha-disc')].map(l => ({
-                nome: l.querySelector('[name=nome]').value.trim(),
-                instituicao: l.querySelector('[name=instituicao]').value.trim(),
-                cargaHoraria: Number(l.querySelector('[name=cargaHoraria]').value)
-            }))
-        };
-        const botao = form.querySelector('[type=submit]');
-        botao.disabled = true;
-        try {
-            const criada = await api('', { method: 'POST', json: dados });
-            navegar('#/s/' + criada.id, 'Rascunho criado. Anexe os documentos e clique em "Enviar solicitação".', true);
-        } catch (err) {
-            erro(err);
-            botao.disabled = false;
-        }
-    };
-}
-
-rotear();

@@ -33,7 +33,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**", "/error",
                                 "/", "/index.html", "/login.html", "/app.js", "/login.js", "/style.css",
-                                "/fonts/**", "/img/**", "/favicon.ico",
+                                "/js/**", "/fonts/**", "/img/**", "/favicon.ico",
                                 "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/usuarios/**").hasRole(Perfil.SERVIDOR.name())
                         .anyRequest().authenticated())

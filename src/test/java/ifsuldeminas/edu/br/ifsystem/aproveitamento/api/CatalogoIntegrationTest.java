@@ -280,6 +280,57 @@ class CatalogoIntegrationTest {
                 .andExpect(status().isUnprocessableEntity());
     }
 
+    @Test
+    void servidorListaCoordenadoresDoCursoEOutrosPerfisRecebem403() throws Exception {
+        Logado servidor = novo(Perfil.SERVIDOR);
+        Logado professor = novo(Perfil.PROFESSOR);
+        String cursoId = criarCurso(servidor, codigo());
+        mvc.perform(json(post("/cursos/{id}/coordenadores", cursoId).header("Authorization", servidor.bearer()),
+                "{\"professorId\":\"%s\"}".formatted(professor.id()))).andExpect(status().isCreated());
+
+        mvc.perform(get("/cursos/{id}/coordenadores", cursoId).header("Authorization", servidor.bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].professorId").value(professor.id().toString()));
+        mvc.perform(get("/cursos/{id}/coordenadores", cursoId).header("Authorization", professor.bearer()))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/cursos/{id}/coordenadores", UUID.randomUUID()).header("Authorization", servidor.bearer()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void professorSoListaSolicitacoesDosCursosQueCoordenaEServidorFiltraPorCurso() throws Exception {
+        Logado servidor = novo(Perfil.SERVIDOR);
+        Logado professor = novo(Perfil.PROFESSOR);
+        Logado aluno = novo(Perfil.ALUNO);
+        String meuCurso = criarCurso(servidor, codigo());
+        String outroCurso = criarCurso(servidor, codigo());
+        String minhaDisciplina = criarDisciplina(servidor, meuCurso, "BD1");
+        String outraDisciplina = criarDisciplina(servidor, outroCurso, "BD1");
+        mvc.perform(json(post("/cursos/{id}/coordenadores", meuCurso).header("Authorization", servidor.bearer()),
+                "{\"professorId\":\"%s\"}".formatted(professor.id()))).andExpect(status().isCreated());
+        String corpo = """
+                {"alunoId":"%s","disciplinaDestinoId":"%s","disciplinas":[
+                  {"nome":"BD I","instituicao":"UFLA","cargaHoraria":64,"ementa":"%s"}]}""";
+        MvcResult mia = mvc.perform(json(post("/aproveitamentos").header("Authorization", aluno.bearer()),
+                corpo.formatted(aluno.id(), minhaDisciplina, EMENTA))).andExpect(status().isCreated()).andReturn();
+        mvc.perform(json(post("/aproveitamentos").header("Authorization", aluno.bearer()),
+                corpo.formatted(aluno.id(), outraDisciplina, EMENTA))).andExpect(status().isCreated());
+        String idMinha = JsonPath.read(mia.getResponse().getContentAsString(), "$.id");
+
+        mvc.perform(get("/aproveitamentos").header("Authorization", professor.bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(idMinha));
+        mvc.perform(get("/aproveitamentos").param("cursoId", outroCurso)
+                        .header("Authorization", servidor.bearer()))
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(org.hamcrest.Matchers.not(idMinha)));
+        mvc.perform(get("/aproveitamentos/{id}", idMinha).header("Authorization", professor.bearer()))
+                .andExpect(jsonPath("$.cursoId").value(meuCurso))
+                .andExpect(jsonPath("$.ementaDestino").value(EMENTA));
+    }
+
     // ---------- solicitacao a partir do catalogo ----------
 
     @Test

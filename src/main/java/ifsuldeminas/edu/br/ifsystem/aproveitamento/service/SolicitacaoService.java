@@ -33,11 +33,14 @@ public class SolicitacaoService {
     private final PreDiagnosticoRepository preDiagnosticos;
     private final HistoricoStatusRepository historicos;
     private final DisciplinaCursoRepository catalogo;
+    private final CatalogoService coordenadores;
 
     public SolicitacaoService(SolicitacaoRepository solicitacoes, DisciplinaCursadaRepository disciplinas,
                               AnexoRepository anexos, PreDiagnosticoRepository preDiagnosticos,
-                              HistoricoStatusRepository historicos, DisciplinaCursoRepository catalogo) {
+                              HistoricoStatusRepository historicos, DisciplinaCursoRepository catalogo,
+                              CatalogoService coordenadores) {
         this.catalogo = catalogo;
+        this.coordenadores = coordenadores;
         this.solicitacoes = solicitacoes;
         this.disciplinas = disciplinas;
         this.anexos = anexos;
@@ -76,19 +79,25 @@ public class SolicitacaoService {
         return historicos.findBySolicitacaoIdOrderByCriadoEmAsc(id).stream().map(HistoricoItem::de).toList();
     }
 
+    /**
+     * Lista com filtros opcionais. {@code professorId}, quando informado, restringe as solicitacoes aos
+     * cursos que o professor coordena.
+     */
     @Transactional(readOnly = true)
-    public List<SolicitacaoResumo> listar(StatusSolicitacao status, UUID alunoId) {
+    public List<SolicitacaoResumo> listar(StatusSolicitacao status, UUID alunoId, UUID cursoId, UUID professorId) {
         List<Solicitacao> encontradas;
-        if (alunoId != null) {
+        if (alunoId != null)
             encontradas = solicitacoes.findByAlunoId(alunoId);
-            if (status != null)
-                encontradas = encontradas.stream().filter(s -> s.getStatus() == status).toList();
-        } else if (status != null) {
+        else if (status != null)
             encontradas = solicitacoes.findByStatus(status);
-        } else {
+        else
             encontradas = solicitacoes.findAll();
-        }
-        return encontradas.stream().map(SolicitacaoResumo::de).toList();
+        return encontradas.stream()
+                .filter(s -> status == null || s.getStatus() == status)
+                .filter(s -> cursoId == null || (s.getDisciplinaCursoDestino() != null
+                        && cursoId.equals(s.getDisciplinaCursoDestino().getCurso().getId())))
+                .filter(s -> professorId == null || coordenadores.coordena(professorId, s))
+                .map(SolicitacaoResumo::de).toList();
     }
 
     /** Consulta leve da solicitacao (sem filhos); 404 se nao existir. */

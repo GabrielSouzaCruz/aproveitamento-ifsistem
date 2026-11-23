@@ -327,3 +327,24 @@ input[type=file] { padding: .4rem; font-size: 14px; }
 .campos { display: grid; grid-template-columns: 2fr 2fr 1fr auto; gap: .75rem; align-items: end; margin-bottom: .5rem; }
 .campos-2 { display: grid; grid-template-columns: 1fr 3fr 1fr; gap: .75rem; }
 @media (max-width: 640px) { .campos, .campos-2 { grid-template-columns: 1fr; } }
+
+/* ---------- Telas por perfil ---------- */
+.filtros { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; }
+.filtros label { margin: 0; min-width: 190px; }
+.filtros select { margin-top: .25rem; padding: .4rem .6rem; font-size: 14px; }
+.acoes-linha { display: inline-flex; flex-wrap: wrap; gap: .4rem; }
+a.btn-mini { text-decoration: none; }
+.campos-curso { display: grid; grid-template-columns: 1fr 3fr; gap: .75rem; }
+.campos-disc { display: grid; grid-template-columns: 1fr 3fr 1fr; gap: .75rem; }
+@media (max-width: 640px) { .campos-curso, .campos-disc { grid-template-columns: 1fr; } }
+textarea { resize: vertical; line-height: 1.5; }
+fieldset.linha-disc { border: 1px solid var(--borda); border-radius: var(--raio-peq); padding: .75rem; margin: 0 0 .75rem; min-width: 0; }
+.ementa { white-space: pre-wrap; margin: .4rem 0 0; font-size: 14px; line-height: 1.55; color: #374151; }
+.ementa-destino { background: var(--menta); border: 1px solid #BBF7D0; border-radius: var(--raio-peq); padding: .75rem 1rem; margin-bottom: .75rem; }
+details.cursada { margin: .4rem 0; padding: .5rem .75rem; border: 1px solid var(--borda); border-radius: var(--raio-peq); }
+details.cursada summary { cursor: pointer; font-size: 14px; }
+.comparacao { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
+.ementa-coluna > .sobretitulo { margin: 0 0 .5rem; }
+.ementa-bloco { display: flex; flex-direction: column; gap: .1rem; border: 1px solid var(--borda); border-radius: var(--raio-peq); padding: .8rem 1rem; margin-bottom: .75rem; }
+.ementa-bloco.destino { background: var(--menta); border-color: #BBF7D0; }
+@media (max-width: 800px) { .comparacao { grid-template-columns: 1fr; } }

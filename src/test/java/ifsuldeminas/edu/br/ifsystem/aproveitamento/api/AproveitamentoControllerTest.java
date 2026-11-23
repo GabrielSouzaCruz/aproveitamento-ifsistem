@@ -205,21 +205,21 @@ class AproveitamentoControllerTest {
 
     @Test
     void listarForcaAlunoIdParaOProprioAluno() throws Exception {
-        when(solicitacoes.listar(any(), any())).thenReturn(List.of());
+        when(solicitacoes.listar(any(), any(), any(), any())).thenReturn(List.of());
 
         mvc.perform(como(get("/aproveitamentos")
                         .param("alunoId", outroAluno.toString())
                         .param("status", "ENVIADA"), aluno, Perfil.ALUNO))
                 .andExpect(status().isOk());
 
-        verify(solicitacoes).listar(StatusSolicitacao.ENVIADA, aluno);
-        verify(solicitacoes, never()).listar(any(), eq(outroAluno));
+        verify(solicitacoes).listar(StatusSolicitacao.ENVIADA, aluno, null, null);
+        verify(solicitacoes, never()).listar(any(), eq(outroAluno), any(), any());
     }
 
     @Test
     void listarMantemFiltroEnviadoParaServidor() throws Exception {
         Solicitacao s = solicitacao(outroAluno);
-        when(solicitacoes.listar(StatusSolicitacao.CONFERENCIA, outroAluno)).thenReturn(List.of(
+        when(solicitacoes.listar(StatusSolicitacao.CONFERENCIA, outroAluno, null, null)).thenReturn(List.of(
                 AproveitamentoDtos.SolicitacaoResumo.de(s)));
 
         mvc.perform(como(get("/aproveitamentos")
@@ -228,17 +228,40 @@ class AproveitamentoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(solicitacaoId.toString()));
 
-        verify(solicitacoes).listar(StatusSolicitacao.CONFERENCIA, outroAluno);
+        verify(solicitacoes).listar(StatusSolicitacao.CONFERENCIA, outroAluno, null, null);
     }
 
     @Test
     void listarSemFiltrosParaServidorNaoRestringeAluno() throws Exception {
-        when(solicitacoes.listar(null, null)).thenReturn(List.of());
+        when(solicitacoes.listar(null, null, null, null)).thenReturn(List.of());
 
         mvc.perform(como(get("/aproveitamentos"), servidor, Perfil.SERVIDOR))
                 .andExpect(status().isOk());
 
-        verify(solicitacoes).listar(null, null);
+        verify(solicitacoes).listar(null, null, null, null);
+    }
+
+    @Test
+    void listarParaProfessorRestringeAosCursosQueCoordena() throws Exception {
+        UUID professor = UUID.randomUUID();
+        when(solicitacoes.listar(any(), any(), any(), any())).thenReturn(List.of());
+
+        mvc.perform(como(get("/aproveitamentos").param("alunoId", outroAluno.toString()), professor,
+                        Perfil.PROFESSOR))
+                .andExpect(status().isOk());
+
+        verify(solicitacoes).listar(null, outroAluno, null, professor);
+    }
+
+    @Test
+    void listarRepassaFiltroDeCurso() throws Exception {
+        UUID curso = UUID.randomUUID();
+        when(solicitacoes.listar(any(), any(), any(), any())).thenReturn(List.of());
+
+        mvc.perform(como(get("/aproveitamentos").param("cursoId", curso.toString()), servidor, Perfil.SERVIDOR))
+                .andExpect(status().isOk());
+
+        verify(solicitacoes).listar(null, null, curso, null);
     }
 
     // ---------- GET historico ----------
