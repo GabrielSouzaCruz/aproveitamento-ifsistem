@@ -1,0 +1,16 @@
+# Postgres opcional (profile default). A demonstracao usa o profile "demo" com H2 e nao precisa disto.
+# Para usar: DB_URL=jdbc:postgresql://localhost:5432/aproveitamento DB_USERNAME=aproveitamento DB_PASSWORD=aproveitamento
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: aproveitamento
+      POSTGRES_USER: aproveitamento
+      POSTGRES_PASSWORD: aproveitamento
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
