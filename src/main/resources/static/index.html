@@ -3,27 +3,51 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Aproveitamento de Disciplinas</title>
+    <title>Aproveitamento de Disciplinas · IF Conect</title>
+    <!-- Fontes do guia visual IF Conect; sem rede, cai nas fontes do sistema. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@600;700;800&display=swap">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-<header class="topo">
-    <div class="topo-marca">
-        <span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-        <div>
-            <strong>Aproveitamento de Disciplinas</strong>
-            <small>IF Sul de Minas · demonstração</small>
+<body class="sem-sessao">
+<div class="layout">
+    <aside class="lateral" id="lateral">
+        <div class="marca">IF <span>Conect</span></div>
+        <p class="area" id="area-usuario"></p>
+        <nav class="menu" id="menu"></nav>
+        <div class="ajuda">
+            <strong>Aproveitamento de disciplinas</strong>
+            <span>Ambiente de demonstração com dados de exemplo.</span>
         </div>
-    </div>
-    <div class="topo-usuario" id="topo-usuario" hidden>
-        <span id="usuario-nome"></span>
-        <button type="button" class="btn btn-claro" id="btn-sair">Trocar usuário</button>
-    </div>
-</header>
+        <div class="usuario">
+            <span class="avatar" id="usuario-iniciais"></span>
+            <div class="usuario-info">
+                <strong id="usuario-nome"></strong>
+                <small id="usuario-papel"></small>
+            </div>
+            <button type="button" class="btn-icone" id="btn-sair" title="Trocar usuário" aria-label="Trocar usuário">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+            </button>
+        </div>
+    </aside>
 
-<div id="aviso" class="aviso" role="alert" hidden></div>
+    <div class="principal">
+        <header class="barra-topo">
+            <h1 id="titulo-pagina">Aproveitamento de Disciplinas</h1>
+            <span class="hoje" id="hoje"></span>
+        </header>
 
-<main id="app" class="conteudo"></main>
+        <div id="aviso" class="aviso" role="alert" hidden></div>
+
+        <main id="app" class="conteudo"></main>
+
+        <footer class="rodape">
+            <span>Dados de exemplo do profile demo</span>
+            <span>IF Conect · Aproveitamento de Disciplinas</span>
+        </footer>
+    </div>
+</div>
 
 <script src="app.js"></script>
 </body>
