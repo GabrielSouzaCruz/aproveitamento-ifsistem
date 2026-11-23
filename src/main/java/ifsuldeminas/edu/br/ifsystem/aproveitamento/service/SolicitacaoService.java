@@ -103,7 +103,7 @@ public class SolicitacaoService {
                 disciplinas.findBySolicitacaoId(id),
                 anexos.findBySolicitacaoId(id),
                 preDiagnosticos.findBySolicitacaoId(id).orElse(null),
-                podeDecidir);
+                podeDecidir, perfil != Perfil.ALUNO);
     }
 
     @Transactional(readOnly = true)

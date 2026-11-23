@@ -7,6 +7,7 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusSolicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.AnexoConteudoRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.AnexoRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.SolicitacaoRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,12 +32,14 @@ public class AnexoService {
     private final SolicitacaoRepository solicitacoes;
     private final AnexoRepository anexos;
     private final AnexoConteudoRepository conteudos;
+    private final ApplicationEventPublisher eventos;
 
     public AnexoService(SolicitacaoRepository solicitacoes, AnexoRepository anexos,
-                        AnexoConteudoRepository conteudos) {
+                        AnexoConteudoRepository conteudos, ApplicationEventPublisher eventos) {
         this.solicitacoes = solicitacoes;
         this.anexos = anexos;
         this.conteudos = conteudos;
+        this.eventos = eventos;
     }
 
     @Transactional
@@ -62,9 +65,12 @@ public class AnexoService {
 
         exigirStatusEditavel(solicitacao);
 
-        Anexo anexo = anexos.save(new Anexo(solicitacao, nomeSeguro(arquivo.getOriginalFilename()),
-                TIPO_PDF, (long) bytes.length));
+        Anexo novo = new Anexo(solicitacao, nomeSeguro(arquivo.getOriginalFilename()),
+                TIPO_PDF, (long) bytes.length);
+        novo.setTextoExtraido(ExtratorTextoPdf.extrair(bytes));
+        Anexo anexo = anexos.save(novo);
         conteudos.save(new AnexoConteudo(anexo, bytes));
+        eventos.publishEvent(new AnexoParaVerificarEvent(anexo.getId()));
         return anexo;
     }
 

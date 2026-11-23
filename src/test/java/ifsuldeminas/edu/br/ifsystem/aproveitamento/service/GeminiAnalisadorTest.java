@@ -42,7 +42,8 @@ class GeminiAnalisadorTest {
     void preparar() {
         RestClient.Builder builder = RestClient.builder().baseUrl("https://gemini.test");
         server = MockRestServiceServer.bindTo(builder).build();
-        analisador = new GeminiAnalisador("chave-ficticia", "gemini-teste", 0, new AnalisadorFake(), builder);
+        analisador = new GeminiAnalisador(new GeminiClient("chave-ficticia", "gemini-teste", 0, builder),
+                new AnalisadorFake());
     }
 
     @Test
@@ -145,7 +146,7 @@ class GeminiAnalisadorTest {
     void semChaveComProvedorGeminiOContextoFalha() {
         new ApplicationContextRunner()
                 .withBean(AnalisadorFake.class)
-                .withUserConfiguration(GeminiAnalisador.class)
+                .withUserConfiguration(GeminiClient.class, GeminiAnalisador.class)
                 .withPropertyValues("ia.provedor=gemini", "ia.gemini.api-key=")
                 .run(contexto -> {
                     assertThat(contexto).hasFailed();
@@ -158,7 +159,7 @@ class GeminiAnalisadorTest {
     void comChaveOContextoSobeEGeminiEPrimario() {
         new ApplicationContextRunner()
                 .withBean(AnalisadorFake.class)
-                .withUserConfiguration(GeminiAnalisador.class)
+                .withUserConfiguration(GeminiClient.class, GeminiAnalisador.class)
                 .withPropertyValues("ia.provedor=gemini", "ia.gemini.api-key=chave-ficticia")
                 .run(contexto -> assertThat(contexto.getBean(AnalisadorEquivalencia.class))
                         .isInstanceOf(GeminiAnalisador.class));
@@ -168,7 +169,7 @@ class GeminiAnalisadorTest {
     void provedorFakePorPadraoNaoCriaOGemini() {
         new ApplicationContextRunner()
                 .withBean(AnalisadorFake.class)
-                .withUserConfiguration(GeminiAnalisador.class)
+                .withUserConfiguration(GeminiClient.class, GeminiAnalisador.class)
                 .run(contexto -> assertThat(contexto).doesNotHaveBean(GeminiAnalisador.class));
     }
 }

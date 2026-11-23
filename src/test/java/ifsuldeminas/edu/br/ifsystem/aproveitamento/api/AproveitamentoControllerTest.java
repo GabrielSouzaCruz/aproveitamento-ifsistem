@@ -13,6 +13,7 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.AnexoService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.FluxoStatusService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.ParecerIaService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.SolicitacaoService;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.VerificacaoAnexoService;
 import ifsuldeminas.edu.br.ifsystem.auth.AuthTestSupport;
 import ifsuldeminas.edu.br.ifsystem.auth.config.SecurityConfig;
 import ifsuldeminas.edu.br.ifsystem.auth.service.JwtService;
@@ -75,6 +76,8 @@ class AproveitamentoControllerTest {
     private AnexoService anexoService;
     @MockitoBean
     private ParecerIaService parecerIa;
+    @MockitoBean
+    private VerificacaoAnexoService verificacao;
     // JwtService real (gera os tokens dos testes); o filtro JWT consulta o usuario no UsuarioService.
     @Autowired
     private JwtService jwtService;
@@ -671,5 +674,67 @@ class AproveitamentoControllerTest {
         mvc.perform(como(post("/aproveitamentos/{id}/parecer-ia/regerar", solicitacaoId), aluno, Perfil.ALUNO))
                 .andExpect(status().isForbidden());
         verify(parecerIa, never()).regerar(any());
+    }
+
+    // ---------- reverificar anexo ----------
+
+    @Test
+    void reverificarAnexoRetorna202ParaServidorEMostraOMotivo() throws Exception {
+        UUID anexoId = UUID.randomUUID();
+        UUID professor = UUID.randomUUID();
+        Solicitacao s = solicitacao(aluno);
+        Anexo anexo = new Anexo(s, "ementa.pdf", "application/pdf", 10L);
+        when(solicitacoes.buscar(solicitacaoId)).thenReturn(s);
+        when(verificacao.podeReverificar(servidor, Perfil.SERVIDOR, solicitacaoId)).thenReturn(true);
+        when(verificacao.reverificar(solicitacaoId, anexoId)).thenReturn(anexo);
+
+        mvc.perform(como(post("/aproveitamentos/{id}/anexos/{anexo}/reverificar", solicitacaoId, anexoId),
+                        servidor, Perfil.SERVIDOR))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.statusVerificacao").value("VERIFICANDO"));
+        verify(verificacao).reverificar(solicitacaoId, anexoId);
+    }
+
+    @Test
+    void reverificarAnexoRetorna202ParaProfessorCoordenador() throws Exception {
+        UUID anexoId = UUID.randomUUID();
+        UUID professor = UUID.randomUUID();
+        Solicitacao s = solicitacao(aluno);
+        when(solicitacoes.buscar(solicitacaoId)).thenReturn(s);
+        when(verificacao.podeReverificar(professor, Perfil.PROFESSOR, solicitacaoId)).thenReturn(true);
+        when(verificacao.reverificar(solicitacaoId, anexoId))
+                .thenReturn(new Anexo(s, "ementa.pdf", "application/pdf", 10L));
+
+        mvc.perform(como(post("/aproveitamentos/{id}/anexos/{anexo}/reverificar", solicitacaoId, anexoId),
+                        professor, Perfil.PROFESSOR))
+                .andExpect(status().isAccepted());
+    }
+
+    @Test
+    void reverificarAnexoRetorna403ParaAlunoEProfessorSemPermissao() throws Exception {
+        UUID anexoId = UUID.randomUUID();
+        UUID professor = UUID.randomUUID();
+        when(solicitacoes.buscar(solicitacaoId)).thenReturn(solicitacao(aluno));
+        when(verificacao.podeReverificar(aluno, Perfil.ALUNO, solicitacaoId)).thenReturn(false);
+        when(verificacao.podeReverificar(professor, Perfil.PROFESSOR, solicitacaoId)).thenReturn(false);
+
+        mvc.perform(como(post("/aproveitamentos/{id}/anexos/{anexo}/reverificar", solicitacaoId, anexoId),
+                        aluno, Perfil.ALUNO)).andExpect(status().isForbidden());
+        mvc.perform(como(post("/aproveitamentos/{id}/anexos/{anexo}/reverificar", solicitacaoId, anexoId),
+                        professor, Perfil.PROFESSOR)).andExpect(status().isForbidden());
+        verify(verificacao, never()).reverificar(any(), any());
+    }
+
+    @Test
+    void reverificarAnexoInexistenteRetorna404() throws Exception {
+        UUID anexoId = UUID.randomUUID();
+        UUID professor = UUID.randomUUID();
+        when(solicitacoes.buscar(solicitacaoId)).thenReturn(solicitacao(aluno));
+        when(verificacao.podeReverificar(servidor, Perfil.SERVIDOR, solicitacaoId)).thenReturn(true);
+        when(verificacao.reverificar(solicitacaoId, anexoId))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Anexo nao encontrado"));
+
+        mvc.perform(como(post("/aproveitamentos/{id}/anexos/{anexo}/reverificar", solicitacaoId, anexoId),
+                        servidor, Perfil.SERVIDOR)).andExpect(status().isNotFound());
     }
 }

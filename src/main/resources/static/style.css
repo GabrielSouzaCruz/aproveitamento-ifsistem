@@ -348,3 +348,8 @@ details.cursada summary { cursor: pointer; font-size: 14px; }
 .ementa-bloco { display: flex; flex-direction: column; gap: .1rem; border: 1px solid var(--borda); border-radius: var(--raio-peq); padding: .8rem 1rem; margin-bottom: .75rem; }
 .ementa-bloco.destino { background: var(--menta); border-color: #BBF7D0; }
 @media (max-width: 800px) { .comparacao { grid-template-columns: 1fr; } }
+
+/* ---------- Verificacao dos anexos ---------- */
+.anexos li .anexo-motivo { flex-basis: 100%; margin: 0; }
+.anexos li .aviso-anexo { color: var(--erro-texto); font-weight: 600; }
+.acoes-anexo { align-items: center; flex-wrap: wrap; }

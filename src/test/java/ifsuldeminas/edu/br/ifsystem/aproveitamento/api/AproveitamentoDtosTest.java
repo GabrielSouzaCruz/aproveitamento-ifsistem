@@ -10,6 +10,8 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.PreDia
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.SolicitacaoDetalhe;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.AproveitamentoDtos.SolicitacaoResumo;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Anexo;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusVerificacao;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.TipoDetectado;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.DisciplinaCursada;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.HistoricoStatus;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.PreDiagnostico;
@@ -82,7 +84,8 @@ class AproveitamentoDtosTest {
         assertThat(DisciplinaCursadaResposta.de(d))
                 .isEqualTo(new DisciplinaCursadaResposta(d.getId(), "BD I", "UFLA", 40, "modelagem sql"));
         assertThat(AnexoResposta.de(a))
-                .isEqualTo(new AnexoResposta(a.getId(), "historico.pdf", 1234L, a.getCriadoEm()));
+                .isEqualTo(new AnexoResposta(a.getId(), "historico.pdf", 1234L, a.getCriadoEm(),
+                        StatusVerificacao.VERIFICANDO, null, null));
         assertThat(HistoricoItem.de(h)).isEqualTo(new HistoricoItem(StatusSolicitacao.RASCUNHO,
                 StatusSolicitacao.ENVIADA, responsavel, "Enviada", h.getCriadoEm()));
     }
@@ -171,5 +174,26 @@ class AproveitamentoDtosTest {
         assertThat(validator.validate(new AcaoRequest(null))).isEmpty();
         assertThat(validator.validate(new AcaoRequest("x".repeat(2000)))).isEmpty();
         assertThat(camposInvalidos(new AcaoRequest("x".repeat(2001)))).containsExactly("observacao");
+    }
+
+    @Test
+    void anexoDoAlunoNaoTrazMotivoNemTipoMasOutrosPerfisTrazem() {
+        Solicitacao s = solicitacao();
+        Anexo a = comId(new Anexo(s, "ementa.pdf", "application/pdf", 10L));
+        a.registrarVerificacao(StatusVerificacao.INVALIDO, TipoDetectado.OUTRO, "Documento sem relacao", "m");
+
+        AnexoResposta aluno = AnexoResposta.de(a, false);
+        AnexoResposta equipe = AnexoResposta.de(a, true);
+
+        assertThat(aluno.statusVerificacao()).isEqualTo(StatusVerificacao.INVALIDO);
+        assertThat(aluno.motivoVerificacao()).isNull();
+        assertThat(aluno.tipoDetectado()).isNull();
+        assertThat(equipe.motivoVerificacao()).isEqualTo("Documento sem relacao");
+        assertThat(equipe.tipoDetectado()).isEqualTo(TipoDetectado.OUTRO);
+
+        assertThat(SolicitacaoDetalhe.de(s, List.of(), List.of(a), null, false, false).anexos().get(0)
+                .motivoVerificacao()).isNull();
+        assertThat(SolicitacaoDetalhe.de(s, List.of(), List.of(a), null, false, true).anexos().get(0)
+                .motivoVerificacao()).isEqualTo("Documento sem relacao");
     }
 }

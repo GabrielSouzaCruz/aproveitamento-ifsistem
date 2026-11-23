@@ -73,6 +73,7 @@ const MENUS = {
 
 const app = document.getElementById('app');
 let pollingParecer = null;
+let pollingAnexos = null;
 
 // ---------- Sessao ----------
 
@@ -258,6 +259,7 @@ const ROTAS = [
 
 async function rotear() {
     clearTimeout(pollingParecer);
+    clearTimeout(pollingAnexos);
     const u = usuarioAtual();
     if (!u) { montarMoldura(null); return sair(); }
     const hash = location.hash.replace(/^#/, '') || '/';
@@ -455,6 +457,9 @@ async function telaDetalhe(id) {
     const podeEditar = u.perfil === 'ALUNO' && STATUS_ANEXO_EDITAVEL.includes(s.status);
     const podeAnexar = u.perfil === 'ALUNO' && STATUS_ANEXO_EDITAVEL.includes(s.status);
     const veParecer = u.perfil !== 'ALUNO';
+    // SERVIDOR e professor veem o motivo da verificacao; reverificar: SERVIDOR ou professor coordenador.
+    const ctxAnexos = { podeAnexar, veMotivo: u.perfil !== 'ALUNO',
+        podeReverificar: u.perfil === 'SERVIDOR' || (u.perfil === 'PROFESSOR' && s.podeDecidir) };
 
     app.innerHTML = `
         <a class="voltar" href="#/">${ICONES.voltar} Voltar para a lista</a>
@@ -517,18 +522,7 @@ async function telaDetalhe(id) {
 
         <section class="card" style="margin-top:1.25rem">
             <h3>Anexos <span class="contador">${s.anexos.length}</span></h3>
-            ${s.anexos.length ? `
-                <ul class="anexos">
-                    ${s.anexos.map(a => `
-                        <li>
-                            <span class="anexo-nome">${ICONES.pdf} <span>${esc(a.nomeArquivo)}
-                                <span class="muted pequeno">· ${tamanho(a.tamanho)} · ${data(a.criadoEm)}</span></span></span>
-                            <span class="acoes-anexo">
-                                <button type="button" class="btn btn-sec btn-mini" data-baixar="${esc(a.id)}" data-nome="${esc(a.nomeArquivo)}">Baixar</button>
-                                ${podeAnexar ? `<button type="button" class="btn btn-perigo btn-mini" data-remover="${esc(a.id)}">Remover</button>` : ''}
-                            </span>
-                        </li>`).join('')}
-                </ul>` : '<p class="muted">Nenhum anexo.</p>'}
+            <div id="lista-anexos">${listaAnexos(s.anexos, ctxAnexos)}</div>
             ${podeAnexar ? `
                 <form id="form-anexo" class="acoes">
                     <input type="file" id="arquivo" accept="application/pdf,.pdf" required aria-label="Arquivo PDF" style="flex:1;min-width:200px">
@@ -538,8 +532,8 @@ async function telaDetalhe(id) {
         </section>`;
 
     app.querySelectorAll('[data-acao]').forEach(b => b.onclick = () => executarAcao(id, b.dataset.acao, b, s));
-    app.querySelectorAll('[data-baixar]').forEach(b => b.onclick = () => baixarAnexo(id, b.dataset.baixar, b.dataset.nome));
-    app.querySelectorAll('[data-remover]').forEach(b => b.onclick = () => removerAnexo(id, b.dataset.remover));
+    ligarAnexos(id);
+    acompanharVerificacao(id, s.anexos, ctxAnexos);
     const formAnexo = document.getElementById('form-anexo');
     if (formAnexo) formAnexo.onsubmit = e => { e.preventDefault(); enviarAnexo(id, formAnexo); };
     if (veParecer) carregarParecer(id);
@@ -565,6 +559,73 @@ async function executarAcao(id, acao, botao, solicitacao) {
 }
 
 // ---------- Anexos ----------
+
+const SELO_ANEXO = {
+    VERIFICANDO: { rotulo: 'Verificando…', classe: 'st-ANALISE' },
+    VALIDO: { rotulo: 'Válido', classe: 'st-DEFERIDA' },
+    INVALIDO: { rotulo: 'Inválido', classe: 'st-INDEFERIDA' },
+    PRECISA_CONFERIR: { rotulo: 'Precisa conferir', classe: 'st-PENDENTE' },
+};
+const TIPO_ANEXO = { EMENTA: 'Ementa', HISTORICO: 'Histórico', OUTRO: 'Outro documento' };
+
+function seloAnexo(a) {
+    const selo = SELO_ANEXO[a.statusVerificacao] || SELO_ANEXO.PRECISA_CONFERIR;
+    return `<span class="status ${selo.classe}">${esc(selo.rotulo)}</span>`;
+}
+
+/** Lista de anexos com selo de verificacao; motivo so para SERVIDOR/professor, aviso so para o aluno. */
+function listaAnexos(anexos, ctx) {
+    if (!anexos.length) return '<p class="muted">Nenhum anexo.</p>';
+    return `<ul class="anexos">${anexos.map(a => `
+        <li>
+            <span class="anexo-nome">${ICONES.pdf} <span>${esc(a.nomeArquivo)}
+                <span class="muted pequeno">· ${tamanho(a.tamanho)} · ${data(a.criadoEm)}</span></span></span>
+            <span class="acoes-anexo">
+                ${seloAnexo(a)}
+                <button type="button" class="btn btn-sec btn-mini" data-baixar="${esc(a.id)}" data-nome="${esc(a.nomeArquivo)}">Baixar</button>
+                ${ctx.podeReverificar ? `<button type="button" class="btn btn-sec btn-mini" data-reverificar="${esc(a.id)}">Reverificar</button>` : ''}
+                ${ctx.podeAnexar ? `<button type="button" class="btn btn-perigo btn-mini" data-remover="${esc(a.id)}">Remover</button>` : ''}
+            </span>
+            ${ctx.veMotivo && a.motivoVerificacao ? `<p class="anexo-motivo pequeno muted">${a.tipoDetectado ? esc(TIPO_ANEXO[a.tipoDetectado] || a.tipoDetectado) + ' · ' : ''}${esc(a.motivoVerificacao)}</p>` : ''}
+            ${!ctx.veMotivo && a.statusVerificacao === 'INVALIDO' ? '<p class="anexo-motivo pequeno aviso-anexo">Revise o anexo.</p>' : ''}
+        </li>`).join('')}</ul>`;
+}
+
+function ligarAnexos(id) {
+    app.querySelectorAll('[data-baixar]').forEach(b => b.onclick = () => baixarAnexo(id, b.dataset.baixar, b.dataset.nome));
+    app.querySelectorAll('[data-remover]').forEach(b => b.onclick = () => removerAnexo(id, b.dataset.remover));
+    app.querySelectorAll('[data-reverificar]').forEach(b => b.onclick = () => reverificarAnexo(id, b.dataset.reverificar, b));
+}
+
+/** Enquanto algum anexo estiver VERIFICANDO, atualiza so a lista de anexos a cada 3 s (ate ~1 min). */
+function acompanharVerificacao(id, anexos, ctx, tentativas = 0) {
+    clearTimeout(pollingAnexos);
+    if (!anexos.some(a => a.statusVerificacao === 'VERIFICANDO') || tentativas >= 20) return;
+    pollingAnexos = setTimeout(async () => {
+        const lista = document.getElementById('lista-anexos');
+        if (!lista) return; // saiu da tela
+        try {
+            const atual = (await api('/' + id)).anexos;
+            const aindaLa = document.getElementById('lista-anexos');
+            if (!aindaLa) return;
+            aindaLa.innerHTML = listaAnexos(atual, ctx);
+            ligarAnexos(id);
+            acompanharVerificacao(id, atual, ctx, tentativas + 1);
+        } catch (e) { /* tenta de novo no proximo ciclo */ acompanharVerificacao(id, anexos, ctx, tentativas + 1); }
+    }, 3000);
+}
+
+async function reverificarAnexo(id, anexoId, botao) {
+    botao.disabled = true;
+    try {
+        await api(`/${id}/anexos/${anexoId}/reverificar`, { method: 'POST', acao: true });
+        await telaDetalhe(id);
+        mostrarAviso('Verificação solicitada. O resultado aparece em alguns segundos.', true);
+    } catch (e) {
+        erro(e);
+        botao.disabled = false;
+    }
+}
 
 async function enviarAnexo(id, form) {
     const arquivo = form.querySelector('#arquivo').files[0];

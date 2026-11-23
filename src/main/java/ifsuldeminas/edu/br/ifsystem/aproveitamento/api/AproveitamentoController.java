@@ -15,6 +15,7 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.AnexoService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.FluxoStatusService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.ParecerIaService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.SolicitacaoService;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.VerificacaoAnexoService;
 import ifsuldeminas.edu.br.ifsystem.auth.service.UsuarioAutenticado;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
 import jakarta.validation.Valid;
@@ -53,9 +54,12 @@ public class AproveitamentoController {
     private final FluxoStatusService fluxo;
     private final AnexoService anexos;
     private final ParecerIaService parecerIa;
+    private final VerificacaoAnexoService verificacao;
 
     public AproveitamentoController(SolicitacaoService solicitacoes, FluxoStatusService fluxo,
-                                    AnexoService anexos, ParecerIaService parecerIa) {
+                                    AnexoService anexos, ParecerIaService parecerIa,
+                                    VerificacaoAnexoService verificacao) {
+        this.verificacao = verificacao;
         this.solicitacoes = solicitacoes;
         this.fluxo = fluxo;
         this.anexos = anexos;
@@ -166,6 +170,16 @@ public class AproveitamentoController {
         exigirAlunoDono(usuarioAtual(), id);
         anexos.remover(id, anexoId);
         return ResponseEntity.noContent().build();
+    }
+
+    /** SERVIDOR ou professor coordenador do curso: refaz a verificacao em segundo plano (202). */
+    @PostMapping("/{id}/anexos/{anexoId}/reverificar")
+    public ResponseEntity<AnexoResposta> reverificarAnexo(@PathVariable UUID id, @PathVariable UUID anexoId) {
+        Usuario usuario = usuarioAtual();
+        solicitacoes.buscar(id);
+        if (!verificacao.podeReverificar(usuario.id(), usuario.perfil(), id))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Perfil sem permissao para reverificar o anexo");
+        return ResponseEntity.accepted().body(AnexoResposta.de(verificacao.reverificar(id, anexoId), true));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
