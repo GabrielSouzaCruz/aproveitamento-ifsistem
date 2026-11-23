@@ -11,6 +11,8 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Solicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusParecerIa;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusPreDiagnostico;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusSolicitacao;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusVerificacao;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.TipoDetectado;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -69,9 +71,19 @@ public final class AproveitamentoDtos {
         }
     }
 
-    public record AnexoResposta(UUID id, String nomeArquivo, Long tamanho, OffsetDateTime criadoEm) {
+    /** {@code motivoVerificacao} e {@code tipoDetectado} so vao para SERVIDOR e professor (nulos para o aluno). */
+    public record AnexoResposta(UUID id, String nomeArquivo, Long tamanho, OffsetDateTime criadoEm,
+                                StatusVerificacao statusVerificacao, TipoDetectado tipoDetectado,
+                                String motivoVerificacao) {
+        /** Visao do aluno: so o selo. */
         public static AnexoResposta de(Anexo a) {
-            return new AnexoResposta(a.getId(), a.getNomeArquivo(), a.getTamanho(), a.getCriadoEm());
+            return de(a, false);
+        }
+
+        public static AnexoResposta de(Anexo a, boolean comMotivo) {
+            return new AnexoResposta(a.getId(), a.getNomeArquivo(), a.getTamanho(), a.getCriadoEm(),
+                    a.getStatusVerificacao(), comMotivo ? a.getTipoDetectado() : null,
+                    comMotivo ? a.getMotivoVerificacao() : null);
         }
     }
 
@@ -103,12 +115,19 @@ public final class AproveitamentoDtos {
         public static SolicitacaoDetalhe de(Solicitacao s, List<DisciplinaCursada> disciplinas,
                                             List<Anexo> anexos, PreDiagnostico preDiagnostico,
                                             boolean podeDecidir) {
+            return de(s, disciplinas, anexos, preDiagnostico, podeDecidir, false);
+        }
+
+        /** {@code verMotivoAnexos}: perfis que enxergam o motivo da verificacao (SERVIDOR e professor). */
+        public static SolicitacaoDetalhe de(Solicitacao s, List<DisciplinaCursada> disciplinas,
+                                            List<Anexo> anexos, PreDiagnostico preDiagnostico,
+                                            boolean podeDecidir, boolean verMotivoAnexos) {
             DisciplinaCurso destino = s.getDisciplinaCursoDestino();
             return new SolicitacaoDetalhe(s.getId(), s.getAlunoId(), s.getCurso(),
                     destino == null ? null : destino.getCurso().getId(), s.getDisciplinaDestino(),
                     s.getCargaHorariaDestino(), destino == null ? null : destino.getEmenta(), s.getStatus(), s.getCriadoEm(), s.getAtualizadoEm(),
                     disciplinas.stream().map(DisciplinaCursadaResposta::de).toList(),
-                    anexos.stream().map(AnexoResposta::de).toList(),
+                    anexos.stream().map(a -> AnexoResposta.de(a, verMotivoAnexos)).toList(),
                     preDiagnostico == null ? null : PreDiagnosticoResposta.de(preDiagnostico),
                     podeDecidir);
         }
