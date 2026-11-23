@@ -110,3 +110,11 @@ Deploy no Render (Blueprint) usando o profile `render`, com Postgres externo (Su
    ```
 2. No Render, clique em **New > Blueprint**, selecione este repositório (o `render.yaml` na raiz é lido automaticamente) e preencha as variáveis do banco (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) e da conta inicial da secretaria (`ADMIN_CPF`, `ADMIN_SENHA`, opcional `ADMIN_EMAIL`). `JWT_SECRET` é gerado pelo Blueprint.
 3. Após o build, a aplicação responde em `https://<servico>.onrender.com` (Swagger em `/swagger-ui.html`; health check em `/v3/api-docs`). No plano free o serviço hiberna após inatividade e a primeira requisição é lenta.
+
+## Migrações de banco (Flyway)
+
+O schema do Postgres (profiles padrão e `render`) é versionado com Flyway em `src/main/resources/db/migration`; o Hibernate só **valida** (`ddl-auto=validate`) e não altera mais o banco. A `V1__schema_inicial.sql` cria todas as tabelas.
+
+**Daqui pra frente, toda mudança de entidade (coluna, tabela, constraint, índice) exige uma nova migração `V{n}__descricao.sql`** (ex.: `V2__add_coluna_x.sql`). Nunca edite uma migração já aplicada. Sem a migração, a aplicação não sobe (falha na validação).
+
+O profile `demo` (H2) e os testes usam `ddl-auto=create-drop` com o Flyway desligado, pois o SQL das migrações é específico do Postgres.
