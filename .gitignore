@@ -32,3 +32,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Deploy / ambiente ###
+*.log
+.env
+.env.*
+.DS_Store
