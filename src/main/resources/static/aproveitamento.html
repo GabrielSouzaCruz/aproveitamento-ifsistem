@@ -12,6 +12,7 @@
 </head>
 <body class="sem-sessao">
 <div class="layout">
+    <div class="overlay" id="overlay" hidden></div>
     <aside class="lateral" id="lateral">
         <a class="marca" href="#/">
             <span class="selo-logo"><img src="img/logo-simbolo.png" alt="" width="32" height="32"></span>
@@ -38,8 +39,12 @@
 
     <div class="principal">
         <header class="barra-topo">
+            <a class="topo-logo" href="#/" aria-label="IF Conect, início"><img src="img/logo-simbolo.png" alt="" width="36" height="36"></a>
             <h1 id="titulo-pagina">Aproveitamento de Disciplinas</h1>
             <span class="hoje" id="hoje"></span>
+            <button type="button" class="btn-menu" id="btn-menu" aria-label="Abrir menu" aria-controls="lateral" aria-expanded="false">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
         </header>
 
         <div id="aviso" class="aviso" role="alert" hidden></div>
@@ -55,6 +60,7 @@
 
 <script src="js/portal-link.js"></script>
 <script src="js/ui-modal.js"></script>
+<script src="js/menu-gaveta.js"></script>
 <script src="app.js"></script>
 <script src="js/aluno.js"></script>
 <script src="js/secretaria.js"></script>

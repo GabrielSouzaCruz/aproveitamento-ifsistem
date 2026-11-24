@@ -45,7 +45,7 @@ async function telaCursos() {
                                 <td data-rotulo="Código">${esc(c.codigo)}</td>
                                 <td data-rotulo="Nome"><strong>${esc(c.nome)}</strong></td>
                                 <td data-rotulo="Situação">${seloAtivo(c.ativo)}</td>
-                                <td data-rotulo="Ações"><span class="acoes-linha">
+                                <td class="celula-acoes"><span class="acoes-linha">
                                     <a class="btn btn-mini" href="#/cursos/${esc(c.id)}">Disciplinas</a>
                                     <button type="button" class="btn btn-sec btn-mini" data-editar="${esc(c.id)}">Editar</button>
                                     <button type="button" class="btn btn-mini ${c.ativo ? 'btn-perigo' : 'btn-sec'}" data-ativo="${esc(c.id)}" data-novo="${!c.ativo}">${c.ativo ? 'Inativar' : 'Ativar'}</button>
@@ -139,7 +139,7 @@ async function telaDisciplinas(cursoId) {
                                     <details class="cursada"><summary>Ver ementa</summary><p class="ementa">${esc(d.ementa)}</p></details></td>
                                 <td data-rotulo="Carga">${esc(d.cargaHoraria)} h</td>
                                 <td data-rotulo="Situação">${seloAtivo(d.ativo)}</td>
-                                <td data-rotulo="Ações"><span class="acoes-linha">
+                                <td class="celula-acoes"><span class="acoes-linha">
                                     <button type="button" class="btn btn-sec btn-mini" data-editar="${esc(d.id)}">Editar</button>
                                     <button type="button" class="btn btn-mini ${d.ativo ? 'btn-perigo' : 'btn-sec'}" data-ativo="${esc(d.id)}" data-novo="${!d.ativo}">${d.ativo ? 'Inativar' : 'Ativar'}</button>
                                 </span></td>
@@ -254,7 +254,7 @@ async function telaCoordenadores() {
                                 <td data-rotulo="Professor"><strong>${esc(p ? p.nome : 'Professor não encontrado')}</strong></td>
                                 <td data-rotulo="E-mail">${esc(p ? p.email : '—')}</td>
                                 <td data-rotulo="Situação">${p ? seloAtivo(p.ativo) : '—'}</td>
-                                <td><button type="button" class="btn btn-perigo btn-mini" data-desvincular="${esc(c.professorId)}">Desvincular</button></td>
+                                <td class="celula-acoes"><button type="button" class="btn btn-perigo btn-mini" data-desvincular="${esc(c.professorId)}">Desvincular</button></td>
                             </tr>`;
                         }).join('')}
                     </tbody>
@@ -331,7 +331,7 @@ async function telaUsuarios() {
                                 <td data-rotulo="E-mail">${esc(x.email)}</td>
                                 <td data-rotulo="Perfil">${esc(PERFIL_ROTULO[x.perfil] || x.perfil)}</td>
                                 <td data-rotulo="Situação">${seloAtivo(x.ativo)}</td>
-                                <td>${x.id === eu.id ? '<span class="muted pequeno">Você</span>'
+                                <td class="celula-acoes">${x.id === eu.id ? '<span class="muted pequeno">Você</span>'
                                     : `<button type="button" class="btn btn-mini ${x.ativo ? 'btn-perigo' : 'btn-sec'}" data-ativo="${esc(x.id)}" data-novo="${!x.ativo}">${x.ativo ? 'Inativar' : 'Ativar'}</button>`}</td>
                             </tr>`).join('')}
                     </tbody>
@@ -341,7 +341,7 @@ async function telaUsuarios() {
 
         <form id="form-usuario" class="card" style="margin-top:1.25rem" autocomplete="off">
             <h3>Novo professor ou servidor</h3>
-            <div class="campos-2" style="grid-template-columns:2fr 1fr 1fr">
+            <div class="campos-2 campos-usuario">
                 <div class="campo"><label for="u-nome">Nome completo</label><input id="u-nome" required></div>
                 <div class="campo"><label for="u-cpf">CPF</label><input id="u-cpf" required inputmode="numeric" placeholder="000.000.000-00"></div>
                 <div class="campo"><label for="u-perfil">Perfil</label>
@@ -350,7 +350,7 @@ async function telaUsuarios() {
                         <option value="SERVIDOR">Servidor (secretaria)</option>
                     </select></div>
             </div>
-            <div class="campos-2" style="grid-template-columns:2fr 1fr">
+            <div class="campos-2 campos-usuario-2">
                 <div class="campo"><label for="u-email">E-mail institucional</label><input id="u-email" type="email" required placeholder="nome@ifsuldeminas.edu.br"></div>
                 <div class="campo"><label for="u-senha">Senha inicial</label><input id="u-senha" type="password" required minlength="8" autocomplete="new-password"></div>
             </div>
