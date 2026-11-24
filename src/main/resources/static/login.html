@@ -20,37 +20,23 @@
                 <img class="logo-completa" src="img/logo-ifconect.png" alt="IF Conect" width="302" height="230">
                 <p class="sobretitulo">Aproveitamento de disciplinas</p>
 
-                <form id="form-login" class="card" novalidate>
+                <div class="card">
                     <h1>Entrar</h1>
-                    <div class="campo"><label for="login-cpf">CPF</label>
-                        <input id="login-cpf" name="cpf" inputmode="numeric" autocomplete="username" placeholder="000.000.000-00" maxlength="14" required></div>
-                    <div class="campo"><label for="login-senha">Senha</label>
-                        <input id="login-senha" name="senha" type="password" autocomplete="current-password" required></div>
-                    <button type="submit" class="btn">Entrar</button>
-                    <p class="muted pequeno">Não tem conta? <a href="#cadastro" id="ir-cadastro">Criar conta</a></p>
-                </form>
-
-                <form id="form-cadastro" class="card" novalidate hidden>
-                    <h1>Criar conta</h1>
-                    <p class="muted pequeno">O cadastro é para alunos. Use seu e-mail institucional.</p>
-                    <div class="campo"><label for="cad-nome">Nome completo</label>
-                        <input id="cad-nome" name="nome" autocomplete="name" required></div>
-                    <div class="campo"><label for="cad-cpf">CPF</label>
-                        <input id="cad-cpf" name="cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" required></div>
-                    <div class="campo"><label for="cad-email">E-mail institucional</label>
-                        <input id="cad-email" name="email" type="email" autocomplete="email" placeholder="nome@exemplo.com" required></div>
-                    <div class="campo"><label for="cad-matricula">Matrícula</label>
-                        <input id="cad-matricula" name="matricula" required></div>
-                    <div class="campo"><label for="cad-senha">Senha (mínimo 8 caracteres)</label>
-                        <input id="cad-senha" name="senha" type="password" autocomplete="new-password" minlength="8" required></div>
-                    <button type="submit" class="btn">Criar conta</button>
-                    <p class="muted pequeno">Já tem conta? <a href="#entrar" id="ir-login">Entrar</a></p>
-                </form>
+                    <p class="muted pequeno">O acesso é pelo login único do IFSISTEM (CPF e senha).</p>
+                    <button type="button" id="btn-entrar" class="btn" disabled>Entrar com IFSISTEM</button>
+                </div>
             </section>
         </main>
     </div>
 </div>
 <script src="js/portal-link.js"></script>
-<script src="login.js"></script>
+<script src="js/sso.js"></script>
+<script>
+    const botao = document.getElementById('btn-entrar');
+    const aviso = document.getElementById('aviso');
+    ssoPronto.then(() => { botao.disabled = false; })
+        .catch(e => { aviso.textContent = e.message; aviso.hidden = false; });
+    botao.onclick = () => IfsistemSSO.login();
+</script>
 </body>
 </html>

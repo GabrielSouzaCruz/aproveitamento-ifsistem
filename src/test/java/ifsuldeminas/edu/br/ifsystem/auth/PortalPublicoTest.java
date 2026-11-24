@@ -19,7 +19,7 @@ class PortalPublicoTest {
 
     @Test
     void raizELoginSaoPublicos() throws Exception {
-        for (String caminho : new String[]{"/", "/login.html", "/aproveitamento.html"}) {
+        for (String caminho : new String[]{"/", "/login.html", "/callback.html", "/aproveitamento.html"}) {
             mvc.perform(get(caminho)).andExpect(status().isOk());
         }
     }
@@ -27,7 +27,9 @@ class PortalPublicoTest {
     @Test
     void configEPublicoEDevolvePortalUrl() throws Exception {
         mvc.perform(get("/config")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.portalUrl").value("#"));
+                .andExpect(jsonPath("$.portalUrl").value("#"))
+                .andExpect(jsonPath("$.authUrl").value("http://auth.teste.invalid"))
+                .andExpect(jsonPath("$.clientId").value("aproveitamento"));
     }
 
     @Test
@@ -38,7 +40,7 @@ class PortalPublicoTest {
 
     @Test
     void endpointsProtegidosContinuamExigindoToken() throws Exception {
-        mvc.perform(get("/usuarios")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/professores")).andExpect(status().isUnauthorized());
         mvc.perform(get("/aproveitamentos")).andExpect(status().isUnauthorized());
     }
 }

@@ -13,14 +13,8 @@ services:
         sync: false
       - key: DB_PASSWORD
         sync: false
-      - key: JWT_SECRET
-        generateValue: true
-      - key: ADMIN_CPF
-        sync: false
-      - key: ADMIN_SENHA
-        sync: false
-      - key: ADMIN_EMAIL
-        sync: false
+      - key: AUTH_ISSUER
+        value: https://ifsistem-auth.onrender.com
       - key: DEMO_SEED
         value: "false"
       - key: JAVA_OPTS

@@ -4,8 +4,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -14,30 +12,19 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * Copia local, somente para leitura nas telas, de um usuario do ifsistem-auth (a fonte da verdade).
+ * O id e o sub do token. Colunas legadas (email, matricula, senha...) ficam fora do mapeamento e nulas.
+ */
 @Entity
-@Table(name = "usuarios", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_usuario_cpf", columnNames = "cpf"),
-        @UniqueConstraint(name = "uk_usuario_email", columnNames = "email"),
-        @UniqueConstraint(name = "uk_usuario_matricula", columnNames = "matricula")
-})
+@Table(name = "usuarios", uniqueConstraints = @UniqueConstraint(name = "uk_usuario_cpf", columnNames = "cpf"))
 public class Usuario {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     @Column(nullable = false)
     private String nome;
     @Column(nullable = false, length = 11)
     private String cpf;
-    @Column(nullable = false)
-    private String email;
-    @Column(nullable = false)
-    private String matricula;
-    /** Hash BCrypt. A coluna segue se chamando "senha" para nao quebrar bancos ja criados. */
-    @Column(name = "senha", nullable = false)
-    private String senhaHash;
-    private String telefone;
-    private String curso;
-    private Integer periodo;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Perfil perfil;
@@ -52,20 +39,18 @@ public class Usuario {
     protected Usuario() {
     }
 
-    public Usuario(String nome, String cpf, String email, String matricula, String senhaHash,
-                   String telefone, String curso, Integer periodo, Perfil perfil) {
-        this.nome = nome;
-        this.cpf = cpf;
-        this.email = email;
-        this.matricula = matricula;
-        this.senhaHash = senhaHash;
-        this.telefone = telefone;
-        this.curso = curso;
-        this.periodo = periodo;
-        this.perfil = perfil;
-        this.status = StatusUsuario.ATIVO;
+    public Usuario(UUID id) {
+        this.id = id;
         this.criadoEm = OffsetDateTime.now();
         this.atualizadoEm = this.criadoEm;
+    }
+
+    /** Aplica os dados vindos do auth (claims do token ou GET /usuarios). */
+    public void sincronizar(String nome, String cpf, Perfil perfil, boolean ativo) {
+        this.nome = nome == null || nome.isBlank() ? "(sem nome)" : nome;
+        this.cpf = Cpf.normalizar(cpf);
+        this.perfil = perfil;
+        this.status = ativo ? StatusUsuario.ATIVO : StatusUsuario.INATIVO;
     }
 
     @PreUpdate
@@ -85,39 +70,6 @@ public class Usuario {
         return cpf;
     }
 
-    public String getEmail() {
-        return email;
-    }
-
-    public String getMatricula() {
-        return matricula;
-    }
-
-    public String getSenhaHash() {
-        return senhaHash;
-    }
-
-    /** Ativo = pode entrar no sistema (status ATIVO). */
-    public boolean isAtivo() {
-        return status == StatusUsuario.ATIVO;
-    }
-
-    public void definirAtivo(boolean ativo) {
-        this.status = ativo ? StatusUsuario.ATIVO : StatusUsuario.INATIVO;
-    }
-
-    public String getTelefone() {
-        return telefone;
-    }
-
-    public String getCurso() {
-        return curso;
-    }
-
-    public Integer getPeriodo() {
-        return periodo;
-    }
-
     public Perfil getPerfil() {
         return perfil;
     }
@@ -126,15 +78,8 @@ public class Usuario {
         return status;
     }
 
-    public void atualizar(String nome, String email, String telefone, String curso, Integer periodo) {
-        this.nome = nome;
-        this.email = email;
-        this.telefone = telefone;
-        this.curso = curso;
-        this.periodo = periodo;
-    }
-
-    public void alterarStatus(StatusUsuario status) {
-        this.status = status;
+    /** Ativo = status ATIVO. */
+    public boolean isAtivo() {
+        return status == StatusUsuario.ATIVO;
     }
 }

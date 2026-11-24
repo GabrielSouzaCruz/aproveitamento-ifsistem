@@ -1,8 +1,8 @@
 'use strict';
 
 /* Tela de demonstracao do fluxo de aproveitamento (padrao visual IF Conect). JS puro, sem build.
- * Autenticacao: login.html obtem o JWT (POST /auth/login), guardado em sessionStorage e enviado
- * como Authorization: Bearer. Um 401 devolve para o login. */
+ * Autenticacao: login unico do ifsistem-auth (IfsistemSSO, ver js/sso.js). O JWT fica no sessionStorage,
+ * e enviado como Authorization: Bearer por IfsistemSSO.fetch. Um 401 leva de volta ao login do auth. */
 
 const API = '/aproveitamentos';
 
@@ -63,8 +63,7 @@ const MENUS = {
     SERVIDOR: [
         { chave: 'inicio', href: '#/', rotulo: 'Fila de solicitações', icone: ICONES.lista },
         { chave: 'cursos', href: '#/cursos', rotulo: 'Cursos e disciplinas', icone: ICONES.livro },
-        { chave: 'coordenadores', href: '#/coordenadores', rotulo: 'Coordenadores', icone: ICONES.chave },
-        { chave: 'usuarios', href: '#/usuarios', rotulo: 'Usuários', icone: ICONES.pessoas }
+        { chave: 'coordenadores', href: '#/coordenadores', rotulo: 'Coordenadores', icone: ICONES.chave }
     ],
     PROFESSOR: [
         { chave: 'inicio', href: '#/', rotulo: 'Para analisar', icone: ICONES.lista }
@@ -78,21 +77,18 @@ let pollingAnexos = null;
 
 // ---------- Sessao ----------
 
+/** Usuario do token (id, cpf, nome, perfil) com os rotulos do perfil; null sem sessao. */
 function usuarioAtual() {
-    const token = sessionStorage.getItem('token');
     let u = null;
-    try { u = JSON.parse(sessionStorage.getItem('usuario')); } catch (e) { /* sessao corrompida */ }
-    if (!token || !u) return null;
-    const exp = Date.parse(sessionStorage.getItem('expiraEm') || '');
-    if (exp && exp < Date.now()) return null;
+    try { u = IfsistemSSO.usuario(); } catch (e) { /* token ilegivel: trata como sem sessao */ }
+    if (!u) return null;
     const p = PERFIS[u.perfil] || { papel: u.perfil, area: '' };
-    return Object.assign({}, u, p, { primeiroNome: u.nome.split(' ')[0] });
+    return Object.assign({}, u, p, { primeiroNome: (u.nome || '').split(' ')[0] });
 }
 
-/** Limpa a sessao e volta para a tela de login. */
+/** Logout do auth (revoga o refresh token, encerra a sessao de la e volta para a raiz). */
 function sair() {
-    ['token', 'usuario', 'expiraEm'].forEach(k => sessionStorage.removeItem(k));
-    location.replace('login.html');
+    return IfsistemSSO.logout();
 }
 
 /** Troca de hash dispara o roteamento; se o hash ja for o mesmo, roteia direto. */
@@ -115,9 +111,7 @@ class ErroApi extends Error {
 function mensagemAmigavel(status, ctx) {
     const perfil = (usuarioAtual() || {}).perfil;
     switch (status) {
-        case 400: return ctx === 'usuario'
-            ? 'Dados inválidos. Confira o CPF, o e-mail institucional e a senha (mínimo de 8 caracteres).'
-            : 'Dados inválidos. Confira os campos e tente novamente.';
+        case 400: return 'Dados inválidos. Confira os campos e tente novamente.';
         case 401: return 'Sessão expirada. Entre novamente.';
         case 403: return ctx === 'acao'
             ? (perfil === 'PROFESSOR'
@@ -129,12 +123,11 @@ function mensagemAmigavel(status, ctx) {
             if (ctx === 'acao') return 'Esta ação não é permitida no status atual da solicitação. A tela foi atualizada.';
             if (ctx === 'catalogo') return 'Já existe um registro com este código.';
             if (ctx === 'coordenador') return 'Este professor já coordena o curso.';
-            if (ctx === 'usuario') return 'CPF, e-mail ou matrícula já cadastrados.';
             return 'Operação não permitida no status atual da solicitação.';
         case 413: return 'Arquivo maior que o limite de 5 MB.';
         case 415: return 'Apenas arquivos PDF são aceitos.';
         case 422: return ctx === 'coordenador'
-            ? 'Só é possível vincular um professor ativo.'
+            ? 'Só é possível vincular um professor ativo que já tenha entrado no sistema.'
             : 'A disciplina destino não existe mais ou foi inativada. Escolha outra.';
         default: return 'Não foi possível concluir a operação (erro ' + status + ').';
     }
@@ -142,15 +135,21 @@ function mensagemAmigavel(status, ctx) {
 
 /** Chamada autenticada a qualquer endpoint; 401 devolve ao login. */
 async function http(caminho, opcoes = {}) {
-    const headers = Object.assign({ 'Authorization': 'Bearer ' + sessionStorage.getItem('token') }, opcoes.headers || {});
+    const headers = Object.assign({}, opcoes.headers || {});
     let corpo = opcoes.body;
     if (opcoes.json !== undefined) {
         headers['Content-Type'] = 'application/json';
         corpo = JSON.stringify(opcoes.json);
     }
-    const resp = await fetch(caminho, { method: opcoes.method || 'GET', headers, body: corpo });
+    let resp;
+    try {
+        resp = await IfsistemSSO.fetch(caminho, { method: opcoes.method || 'GET', headers, body: corpo });
+    } catch (e) { // sem sessao ou renovacao recusada
+        IfsistemSSO.login();
+        throw new ErroApi(401, mensagemAmigavel(401));
+    }
     if (!resp.ok) {
-        if (resp.status === 401) { sair(); throw new ErroApi(401, mensagemAmigavel(401)); }
+        if (resp.status === 401) { IfsistemSSO.login(); throw new ErroApi(401, mensagemAmigavel(401)); }
         const corpoErro = await resp.json().catch(() => null);
         throw new ErroApi(resp.status, mensagemAmigavel(resp.status, opcoes.ctx || (opcoes.acao ? 'acao' : undefined)), corpoErro);
     }
@@ -263,15 +262,14 @@ const ROTAS = [
     { re: /^\/nova$/, chave: 'nova', perfis: ['ALUNO'], tela: () => telaNova() },
     { re: /^\/cursos$/, chave: 'cursos', perfis: ['SERVIDOR'], tela: () => telaCursos() },
     { re: new RegExp('^/cursos/' + UUID_RE + '$', 'i'), chave: 'cursos', perfis: ['SERVIDOR'], tela: id => telaDisciplinas(id) },
-    { re: /^\/coordenadores$/, chave: 'coordenadores', perfis: ['SERVIDOR'], tela: () => telaCoordenadores() },
-    { re: /^\/usuarios$/, chave: 'usuarios', perfis: ['SERVIDOR'], tela: () => telaUsuarios() }
+    { re: /^\/coordenadores$/, chave: 'coordenadores', perfis: ['SERVIDOR'], tela: () => telaCoordenadores() }
 ];
 
 async function rotear() {
     clearTimeout(pollingParecer);
     clearTimeout(pollingAnexos);
     const u = usuarioAtual();
-    if (!u) { montarMoldura(null); return sair(); }
+    if (!u) { montarMoldura(null); return IfsistemSSO.login(); }
     const hash = location.hash.replace(/^#/, '') || '/';
     let rota = null, args = [];
     for (const r of ROTAS) {

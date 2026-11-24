@@ -1,6 +1,6 @@
 'use strict';
 
-/* Telas da secretaria (SERVIDOR): cursos e disciplinas, coordenadores e usuarios. */
+/* Telas da secretaria (SERVIDOR): cursos e disciplinas, coordenadores. A gestao de usuarios e no ifsistem-auth. */
 
 function seloAtivo(ativo) {
     return `<span class="status ${ativo ? 'st-DEFERIDA' : 'st-INDEFERIDA'}">${ativo ? 'Ativo' : 'Inativo'}</span>`;
@@ -218,17 +218,24 @@ async function telaDisciplinas(cursoId) {
 
 // ---------- Coordenadores ----------
 
+function mascaraCpf(cpf) {
+    const d = String(cpf || '').replace(/\D/g, '');
+    return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d;
+}
+
 let cursoCoordSelecionado = '';
+/** CPF digitado na busca de professor (consulta tambem o auth); vazio lista os ja sincronizados. */
+let cpfBuscaProfessor = '';
 
 async function telaCoordenadores() {
     titulo('Coordenadores');
     app.innerHTML = '<p class="muted carregando">Carregando</p>';
-    const [cursos, professores] = await Promise.all([http('/cursos'), http('/usuarios?perfil=PROFESSOR')]);
+    const [cursos, professores] = await Promise.all([http('/cursos'), http('/professores' + (cpfBuscaProfessor ? '?cpf=' + encodeURIComponent(cpfBuscaProfessor) : ''))]);
     if (!cursos.some(c => c.id === cursoCoordSelecionado)) cursoCoordSelecionado = cursos.length ? cursos[0].id : '';
     const coordenadores = cursoCoordSelecionado ? await http(`/cursos/${cursoCoordSelecionado}/coordenadores`) : [];
     const porId = new Map(professores.map(p => [p.id, p]));
     const vinculados = new Set(coordenadores.map(c => c.professorId));
-    const candidatos = professores.filter(p => p.ativo && !vinculados.has(p.id));
+    const candidatos = professores.filter(p => !vinculados.has(p.id));
 
     app.innerHTML = `
         <section class="card">
@@ -245,15 +252,14 @@ async function telaCoordenadores() {
             <div class="card-cab"><h3>Coordenadores do curso <span class="contador">${coordenadores.length}</span></h3></div>
             <div class="tabela-wrap">
                 <table class="responsiva">
-                    <thead><tr><th>Professor</th><th>E-mail</th><th>Situação</th><th><span hidden>Ações</span></th></tr></thead>
+                    <thead><tr><th>Professor</th><th>CPF</th><th><span hidden>Ações</span></th></tr></thead>
                     <tbody>
-                        ${coordenadores.length === 0 ? '<tr><td colspan="4" class="vazio">Nenhum professor coordena este curso.</td></tr>' : ''}
+                        ${coordenadores.length === 0 ? '<tr><td colspan="3" class="vazio">Nenhum professor coordena este curso.</td></tr>' : ''}
                         ${coordenadores.map(c => {
                             const p = porId.get(c.professorId);
                             return `<tr>
                                 <td data-rotulo="Professor"><strong>${esc(p ? p.nome : 'Professor não encontrado')}</strong></td>
-                                <td data-rotulo="E-mail">${esc(p ? p.email : '—')}</td>
-                                <td data-rotulo="Situação">${p ? seloAtivo(p.ativo) : '—'}</td>
+                                <td data-rotulo="CPF">${esc(p ? mascaraCpf(p.cpf) : '—')}</td>
                                 <td class="celula-acoes"><button type="button" class="btn btn-perigo btn-mini" data-desvincular="${esc(c.professorId)}">Desvincular</button></td>
                             </tr>`;
                         }).join('')}
@@ -267,11 +273,21 @@ async function telaCoordenadores() {
             <div class="campo"><label for="sel-prof">Professor (ativo)</label>
                 <select id="sel-prof" required ${candidatos.length && cursoCoordSelecionado ? '' : 'disabled'}>
                     ${candidatos.length
-                        ? '<option value="">Selecione o professor</option>' + candidatos.map(p => `<option value="${esc(p.id)}">${esc(p.nome)} · ${esc(p.email)}</option>`).join('')
+                        ? '<option value="">Selecione o professor</option>' + candidatos.map(p => `<option value="${esc(p.id)}">${esc(p.nome)} · ${esc(mascaraCpf(p.cpf))}</option>`).join('')
                         : '<option value="">Nenhum professor ativo disponível para vincular</option>'}
                 </select></div>
             <button type="submit" class="btn" ${candidatos.length && cursoCoordSelecionado ? '' : 'disabled'}>Vincular</button>
-            ${professores.length === 0 ? '<p class="muted pequeno">Cadastre professores na tela "Usuários".</p>' : ''}
+            ${professores.length === 0 ? '<p class="muted pequeno">Nenhum professor entrou no sistema ainda. Busque pelo CPF abaixo; o cadastro dos usuários é feito no ifsistem-auth.</p>' : ''}
+        </form>
+
+        <form id="form-busca-prof" class="card" style="margin-top:1.25rem">
+            <h3>Buscar professor por CPF</h3>
+            <p class="muted pequeno">Procura também no cadastro do ifsistem-auth, mesmo que o professor ainda não tenha entrado aqui.</p>
+            <div class="campo"><label for="busca-cpf">CPF</label>
+                <input id="busca-cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" value="${esc(cpfBuscaProfessor)}"></div>
+            <button type="submit" class="btn">Buscar</button>
+            ${cpfBuscaProfessor ? '<button type="button" class="btn btn-secundario" id="limpar-busca">Limpar busca</button>' : ''}
+            ${cpfBuscaProfessor && professores.length === 0 ? '<p class="muted pequeno">Nenhum professor ativo com este CPF.</p>' : ''}
         </form>`;
 
     const sel = document.getElementById('sel-curso');
@@ -284,6 +300,13 @@ async function telaCoordenadores() {
                 { method: 'DELETE', json: { professorId: b.dataset.desvincular }, ctx: 'coordenador' }),
             'Professor desvinculado do curso.', telaCoordenadores).then(ok => { if (!ok) b.disabled = false; });
     });
+    document.getElementById('form-busca-prof').onsubmit = e => {
+        e.preventDefault();
+        cpfBuscaProfessor = document.getElementById('busca-cpf').value.replace(/\D/g, '');
+        telaCoordenadores().catch(erro);
+    };
+    const limpar = document.getElementById('limpar-busca');
+    if (limpar) limpar.onclick = () => { cpfBuscaProfessor = ''; telaCoordenadores().catch(erro); };
     document.getElementById('form-coord').onsubmit = e => {
         e.preventDefault();
         const botao = e.target.querySelector('[type=submit]');
@@ -291,100 +314,5 @@ async function telaCoordenadores() {
         escrever(() => http(`/cursos/${cursoCoordSelecionado}/coordenadores`,
                 { method: 'POST', json: { professorId: document.getElementById('sel-prof').value }, ctx: 'coordenador' }),
             'Professor vinculado ao curso.', telaCoordenadores).then(ok => { if (!ok) botao.disabled = false; });
-    };
-}
-
-// ---------- Usuarios ----------
-
-let filtroPerfilUsuarios = '';
-
-const PERFIL_ROTULO = { ALUNO: 'Aluno', PROFESSOR: 'Professor', SERVIDOR: 'Servidor (secretaria)' };
-
-async function telaUsuarios() {
-    titulo('Usuários');
-    app.innerHTML = '<p class="muted carregando">Carregando usuários</p>';
-    const eu = usuarioAtual();
-    const usuarios = await http('/usuarios' + (filtroPerfilUsuarios ? '?perfil=' + filtroPerfilUsuarios : ''));
-    usuarios.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-
-    app.innerHTML = `
-        <section class="card card-tabela">
-            <div class="card-cab">
-                <h3>Usuários <span class="contador">${usuarios.length}</span></h3>
-                <div class="filtros">
-                    <label>Perfil
-                        <select id="filtro-perfil">
-                            <option value="">Todos</option>
-                            ${Object.keys(PERFIL_ROTULO).map(k => `<option value="${k}">${esc(PERFIL_ROTULO[k])}</option>`).join('')}
-                        </select></label>
-                </div>
-            </div>
-            <div class="tabela-wrap">
-                <table class="responsiva">
-                    <thead><tr><th>Nome</th><th>CPF</th><th>E-mail</th><th>Perfil</th><th>Situação</th><th><span hidden>Ações</span></th></tr></thead>
-                    <tbody>
-                        ${usuarios.length === 0 ? '<tr><td colspan="6" class="vazio">Nenhum usuário encontrado.</td></tr>' : ''}
-                        ${usuarios.map(x => `
-                            <tr>
-                                <td data-rotulo="Nome"><strong>${esc(x.nome)}</strong></td>
-                                <td data-rotulo="CPF">${esc(cpfMascarado(x.cpf))}</td>
-                                <td data-rotulo="E-mail">${esc(x.email)}</td>
-                                <td data-rotulo="Perfil">${esc(PERFIL_ROTULO[x.perfil] || x.perfil)}</td>
-                                <td data-rotulo="Situação">${seloAtivo(x.ativo)}</td>
-                                <td class="celula-acoes">${x.id === eu.id ? '<span class="muted pequeno">Você</span>'
-                                    : `<button type="button" class="btn btn-mini ${x.ativo ? 'btn-perigo' : 'btn-sec'}" data-ativo="${esc(x.id)}" data-novo="${!x.ativo}">${x.ativo ? 'Inativar' : 'Ativar'}</button>`}</td>
-                            </tr>`).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <form id="form-usuario" class="card" style="margin-top:1.25rem" autocomplete="off">
-            <h3>Novo professor ou servidor</h3>
-            <div class="campos-2 campos-usuario">
-                <div class="campo"><label for="u-nome">Nome completo</label><input id="u-nome" required></div>
-                <div class="campo"><label for="u-cpf">CPF</label><input id="u-cpf" required inputmode="numeric" placeholder="000.000.000-00"></div>
-                <div class="campo"><label for="u-perfil">Perfil</label>
-                    <select id="u-perfil" required>
-                        <option value="PROFESSOR">Professor</option>
-                        <option value="SERVIDOR">Servidor (secretaria)</option>
-                    </select></div>
-            </div>
-            <div class="campos-2 campos-usuario-2">
-                <div class="campo"><label for="u-email">E-mail institucional</label><input id="u-email" type="email" required placeholder="nome@ifsuldeminas.edu.br"></div>
-                <div class="campo"><label for="u-senha">Senha inicial</label><input id="u-senha" type="password" required minlength="8" autocomplete="new-password"></div>
-            </div>
-            <button type="submit" class="btn">Criar usuário</button>
-            <p class="muted pequeno">Alunos se cadastram sozinhos na tela de login. A senha deve ter ao menos 8 caracteres.</p>
-        </form>`;
-
-    const filtro = document.getElementById('filtro-perfil');
-    filtro.value = filtroPerfilUsuarios;
-    filtro.onchange = () => { filtroPerfilUsuarios = filtro.value; telaUsuarios().catch(erro); };
-
-    const cpf = document.getElementById('u-cpf');
-    cpf.addEventListener('input', () => {
-        const d = cpf.value.replace(/\D/g, '').slice(0, 11);
-        cpf.value = d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
-            .replace(/\.(\d{3})(\d)/, '.$1-$2');
-    });
-
-    app.querySelectorAll('[data-ativo]').forEach(b => b.onclick = async () => {
-        const ativar = b.dataset.novo === 'true';
-        if (!ativar && !(await modalConfirmar({ titulo: 'Confirmar', mensagem: 'Inativar este usuário? Ele não conseguirá mais entrar no sistema.', textoOk: 'Inativar', perigo: true }))) return;
-        b.disabled = true;
-        escrever(() => http(`/usuarios/${b.dataset.ativo}/ativo`, { method: 'PATCH', json: { ativo: ativar }, ctx: 'usuario' }),
-            ativar ? 'Usuário ativado.' : 'Usuário inativado.', telaUsuarios).then(ok => { if (!ok) b.disabled = false; });
-    });
-    document.getElementById('form-usuario').onsubmit = e => {
-        e.preventDefault();
-        const v = id => document.getElementById(id).value.trim();
-        const botao = e.target.querySelector('[type=submit]');
-        botao.disabled = true;
-        escrever(() => http('/usuarios', { method: 'POST', ctx: 'usuario', json: {
-                nome: v('u-nome'), cpf: v('u-cpf'), email: v('u-email'),
-                senha: document.getElementById('u-senha').value, perfil: v('u-perfil')
-            } }),
-            'Usuário criado.', telaUsuarios).then(ok => { if (!ok) botao.disabled = false; });
     };
 }

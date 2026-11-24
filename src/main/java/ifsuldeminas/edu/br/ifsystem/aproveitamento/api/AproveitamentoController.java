@@ -17,7 +17,7 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.NovaTentativaJaExiste
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.ParecerIaService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.SolicitacaoService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.VerificacaoAnexoService;
-import ifsuldeminas.edu.br.ifsystem.auth.service.UsuarioAutenticado;
+import ifsuldeminas.edu.br.ifsystem.seguranca.UsuarioAutenticado;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
 import jakarta.validation.Valid;
 import org.springframework.http.ContentDisposition;
@@ -225,10 +225,10 @@ public class AproveitamentoController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solicitacao pertence a outro aluno");
     }
 
-    /** Usuario autenticado, colocado no SecurityContext pelo JwtAuthFilter. */
+    /** Usuario autenticado, lido do JWT do ifsistem-auth (sub e perfil). */
     private Usuario usuarioAtual() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof UsuarioAutenticado u))
+        UsuarioAutenticado u = UsuarioAutenticado.de(SecurityContextHolder.getContext().getAuthentication());
+        if (u == null)
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao necessaria");
         return new Usuario(u.id(), u.perfil());
     }
