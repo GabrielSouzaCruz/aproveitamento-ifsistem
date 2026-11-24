@@ -7,7 +7,7 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.CatalogoDtos.CursoRespost
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.CatalogoDtos.DisciplinaCursoRequest;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.api.CatalogoDtos.DisciplinaCursoResposta;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.CatalogoService;
-import ifsuldeminas.edu.br.ifsystem.auth.service.UsuarioAutenticado;
+import ifsuldeminas.edu.br.ifsystem.seguranca.UsuarioAutenticado;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -136,8 +136,8 @@ public class CatalogoController {
     }
 
     private static UsuarioAutenticado usuarioAtual() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof UsuarioAutenticado u))
+        UsuarioAutenticado u = UsuarioAutenticado.de(SecurityContextHolder.getContext().getAuthentication());
+        if (u == null)
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao necessaria");
         return u;
     }

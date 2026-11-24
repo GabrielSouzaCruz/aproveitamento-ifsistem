@@ -12,7 +12,6 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.DisciplinaCursoRep
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.SolicitacaoRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.FluxoStatusService;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
-import ifsuldeminas.edu.br.ifsystem.usuario.domain.StatusUsuario;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -22,7 +21,6 @@ import org.springframework.context.annotation.Conditional;
 import org.springframework.core.env.Profiles;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -33,10 +31,10 @@ import java.util.UUID;
  * Dados de exemplo para demonstracao. So roda com o profile "demo" ou com {@code DEMO_SEED=true}
  * (propriedade {@code app.demo-seed}); em producao (profile "render") o padrao e desligado.
  * <p>
- * Usuarios e solicitacoes sao inseridos via JDBC para terem UUIDs fixos (as entidades usam
- * {@code @GeneratedValue}); os avancos de status passam pelo {@link FluxoStatusService}, gerando
+ * Nao cria usuarios: eles vivem no ifsistem-auth e os UUIDs fixos abaixo sao os de la (a copia local entra no
+ * primeiro login). Solicitacoes sao inseridas via JDBC para terem UUIDs fixos; os avancos de status passam pelo {@link FluxoStatusService}, gerando
  * historico e o parecer da IA (assincrono, apos o commit) como no uso real.
- * Idempotente: se o aluno demo ja existe, nada e feito.
+ * Idempotente: se o curso demo ja existe, so os textos sao atualizados.
  */
 @Component
 @Conditional(DemoSeed.Ativado.class)
@@ -45,10 +43,6 @@ public class DemoSeed implements CommandLineRunner {
 
     public static final String CURSO_CODIGO = "TADS";
     public static final String CURSO = "Tecnologia em Análise e Desenvolvimento de Sistemas";
-    public static final String SENHA = "demo1234";
-    public static final String CPF_ALUNO = "52998224725";
-    public static final String CPF_SERVIDOR = "11144477735";
-    public static final String CPF_PROFESSOR = "12345678909";
     public static final UUID ALUNO_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     public static final UUID SERVIDOR_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     public static final UUID PROFESSOR_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
@@ -90,7 +84,6 @@ public class DemoSeed implements CommandLineRunner {
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
-    private final PasswordEncoder encoder;
     private final FluxoStatusService fluxo;
     private final SolicitacaoRepository solicitacoes;
     private final DisciplinaCursadaRepository disciplinas;
@@ -98,12 +91,11 @@ public class DemoSeed implements CommandLineRunner {
     private final CursoRepository cursos;
     private final DisciplinaCursoRepository catalogo;
 
-    public DemoSeed(JdbcTemplate jdbc, TransactionTemplate tx, PasswordEncoder encoder, FluxoStatusService fluxo,
+    public DemoSeed(JdbcTemplate jdbc, TransactionTemplate tx, FluxoStatusService fluxo,
                     SolicitacaoRepository solicitacoes, DisciplinaCursadaRepository disciplinas,
                     CoordenadorRepository coordenadores, CursoRepository cursos, DisciplinaCursoRepository catalogo) {
         this.jdbc = jdbc;
         this.tx = tx;
-        this.encoder = encoder;
         this.fluxo = fluxo;
         this.solicitacoes = solicitacoes;
         this.disciplinas = disciplinas;
@@ -114,27 +106,19 @@ public class DemoSeed implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        Integer existentes = jdbc.queryForObject("select count(*) from usuarios where id = ?", Integer.class, ALUNO_ID);
+        Integer existentes = jdbc.queryForObject("select count(*) from cursos where codigo = ?", Integer.class, CURSO_CODIGO);
         if (existentes != null && existentes > 0) {
-            // Bancos semeados antes do login real: atualiza CPF (valido) e senha dos usuarios demo.
-            String senha = encoder.encode(SENHA);
-            jdbc.update("update usuarios set cpf = ?, senha = ? where id = ?", CPF_ALUNO, senha, ALUNO_ID);
-            jdbc.update("update usuarios set cpf = ?, senha = ? where id = ?", CPF_SERVIDOR, senha, SERVIDOR_ID);
-            jdbc.update("update usuarios set cpf = ?, senha = ? where id = ?", CPF_PROFESSOR, senha, PROFESSOR_ID);
             tx.executeWithoutResult(status -> atualizarTextos());
-            log.info("Seed demo ja existe: credenciais e textos demo atualizados");
+            log.info("Seed demo ja existe: textos demo atualizados");
             return;
         }
         // Uma transacao so: ou entra tudo, ou nada. Os eventos de envio disparam o parecer apos o commit.
         tx.executeWithoutResult(status -> popular());
-        log.info("Seed demo criado: aluno {}, servidor {}, professor {}", ALUNO_ID, SERVIDOR_ID, PROFESSOR_ID);
+        log.info("Seed demo criado (usuarios do auth): aluno {}, servidor {}, professor {}", ALUNO_ID, SERVIDOR_ID, PROFESSOR_ID);
     }
 
-    /** Bancos ja semeados (por ID/codigo): corrige nomes e textos para a grafia com acentos. */
+    /** Bancos ja semeados (por ID/codigo): corrige textos para a grafia com acentos. */
     private void atualizarTextos() {
-        jdbc.update("update usuarios set nome = ? where id = ?", "Ana Aluna Demo", ALUNO_ID);
-        jdbc.update("update usuarios set nome = ? where id = ?", "Sérgio Servidor Demo", SERVIDOR_ID);
-        jdbc.update("update usuarios set nome = ? where id = ?", "Paula Professora Demo", PROFESSOR_ID);
         jdbc.update("update cursos set nome = ? where codigo = ?", CURSO, CURSO_CODIGO);
         String[][] catalogoDemo = {
                 {"TADS101", "Algoritmos e Lógica de Programação", EMENTA_PROGRAMACAO},
@@ -162,14 +146,6 @@ public class DemoSeed implements CommandLineRunner {
     }
 
     private void popular() {
-        String senha = encoder.encode(SENHA);
-        inserirUsuario(ALUNO_ID, "Ana Aluna Demo", CPF_ALUNO, "aluno.demo@ifsuldeminas.edu.br",
-                "DEMO-ALU-001", senha, CURSO_CODIGO, 3, Perfil.ALUNO);
-        inserirUsuario(SERVIDOR_ID, "Sérgio Servidor Demo", CPF_SERVIDOR, "servidor.demo@ifsuldeminas.edu.br",
-                "DEMO-SRV-001", senha, null, null, Perfil.SERVIDOR);
-        inserirUsuario(PROFESSOR_ID, "Paula Professora Demo", CPF_PROFESSOR, "professor.demo@ifsuldeminas.edu.br",
-                "DEMO-PRF-001", senha, null, null, Perfil.PROFESSOR);
-
         Curso tads = cursos.saveAndFlush(new Curso(CURSO_CODIGO, CURSO));
         coordenadores.save(new Coordenador(PROFESSOR_ID, tads));
         DisciplinaCurso programacao = catalogo.saveAndFlush(new DisciplinaCurso(tads, "TADS101",
@@ -198,17 +174,6 @@ public class DemoSeed implements CommandLineRunner {
                 "Pré-diagnóstico concluído");
         fluxo.executar(SOLICITACAO_DEFERIDA_ID, "analisar", PROFESSOR_ID, Perfil.PROFESSOR, "Ementas equivalentes");
         fluxo.executar(SOLICITACAO_DEFERIDA_ID, "deferir", PROFESSOR_ID, Perfil.PROFESSOR, "Aproveitamento deferido");
-    }
-
-    private void inserirUsuario(UUID id, String nome, String cpf, String email, String matricula, String senha,
-                                String curso, Integer periodo, Perfil perfil) {
-        OffsetDateTime agora = OffsetDateTime.now();
-        jdbc.update("""
-                        insert into usuarios (id, nome, cpf, email, matricula, senha, telefone, curso, periodo,
-                                              perfil, status, criado_em, atualizado_em)
-                        values (?, ?, ?, ?, ?, ?, null, ?, ?, ?, ?, ?, ?)""",
-                id, nome, cpf, email, matricula, senha, curso, periodo,
-                perfil.name(), StatusUsuario.ATIVO.name(), agora, agora);
     }
 
     private void inserirSolicitacao(UUID id, DisciplinaCurso destino, String disciplinaOrigem, String instituicao,
