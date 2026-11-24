@@ -104,9 +104,10 @@ function irPara(hash) {
 // ---------- HTTP ----------
 
 class ErroApi extends Error {
-    constructor(status, mensagem) {
+    constructor(status, mensagem, corpo) {
         super(mensagem);
         this.status = status;
+        this.corpo = corpo || null;
     }
 }
 
@@ -150,7 +151,8 @@ async function http(caminho, opcoes = {}) {
     const resp = await fetch(caminho, { method: opcoes.method || 'GET', headers, body: corpo });
     if (!resp.ok) {
         if (resp.status === 401) { sair(); throw new ErroApi(401, mensagemAmigavel(401)); }
-        throw new ErroApi(resp.status, mensagemAmigavel(resp.status, opcoes.ctx || (opcoes.acao ? 'acao' : undefined)));
+        const corpoErro = await resp.json().catch(() => null);
+        throw new ErroApi(resp.status, mensagemAmigavel(resp.status, opcoes.ctx || (opcoes.acao ? 'acao' : undefined)), corpoErro);
     }
     if (opcoes.blob) return resp.blob();
     const texto = await resp.text();
@@ -425,6 +427,7 @@ function linhaSolicitacao(u, s) {
     return `
         <tr class="clicavel" data-id="${esc(s.id)}" tabindex="0">
             <td data-rotulo="Disciplina"><strong>${esc(s.disciplinaDestino)}</strong>
+                ${s.solicitacaoOrigemId ? '<span class="selo-nova">Nova tentativa</span>' : ''}
                 ${aguardaAcao(u, s) ? '<span class="sub">Aguarda sua ação</span>' : ''}</td>
             <td data-rotulo="Curso">${esc(s.curso)}</td>
             <td data-rotulo="Status">${statusBadge(s.status)}</td>
@@ -484,6 +487,7 @@ async function telaDetalhe(id) {
 
     app.innerHTML = `
         <a class="voltar" href="#/">${ICONES.voltar} Voltar para a lista</a>
+        ${blocoOrigem(s, u)}
 
         <section class="card">
             <div class="cabecalho-detalhe">
@@ -495,6 +499,7 @@ async function telaDetalhe(id) {
                 ${statusBadge(s.status)}
             </div>
             ${podeEditar ? `<div class="acoes" style="margin-top:1rem"><a class="btn btn-sec" href="#/s/${esc(id)}/editar">Editar</a></div>` : ''}
+            ${blocoNovaTentativa(s, u)}
             ${acoes.length ? `
                 <div class="campo" style="margin-top:1.25rem">
                     <label for="obs">Observação (opcional)</label>
@@ -553,11 +558,54 @@ async function telaDetalhe(id) {
         </section>`;
 
     app.querySelectorAll('[data-acao]').forEach(b => b.onclick = () => executarAcao(id, b.dataset.acao, b, s));
+    const btnNova = document.getElementById('solicitar-novamente');
+    if (btnNova) btnNova.onclick = () => solicitarNovamente(id, btnNova);
     ligarAnexos(id);
     acompanharVerificacao(id, s.anexos, ctxAnexos);
     const formAnexo = document.getElementById('form-anexo');
     if (formAnexo) formAnexo.onsubmit = e => { e.preventDefault(); enviarAnexo(id, formAnexo); };
     if (veParecer) carregarParecer(id);
+}
+
+/** Aviso no topo: solicitacao que nasceu de um indeferimento (motivo + link para a original). */
+function blocoOrigem(s, u) {
+    if (!s.solicitacaoOrigemId) return '';
+    const motivo = s.motivoIndeferimentoOrigem
+        ? `<p>Decisão anterior (indeferida): “${esc(s.motivoIndeferimentoOrigem)}”</p>`
+        : '<p class="muted">O indeferimento anterior não tem motivo registrado.</p>';
+    const titulo = u.perfil === 'ALUNO' && s.status === 'RASCUNHO'
+        ? 'Este rascunho é uma nova tentativa de uma solicitação indeferida.'
+        : 'Nova tentativa de uma solicitação indeferida.';
+    return `<section class="nota-origem"><span class="selo-nova">Nova tentativa</span>
+        <strong>${titulo}</strong>${motivo}
+        <a href="#/s/${esc(s.solicitacaoOrigemId)}">Ver solicitação original</a></section>`;
+}
+
+/** Aluno: "Solicitar novamente" na INDEFERIDA sem tentativa, ou link para a tentativa existente. */
+function blocoNovaTentativa(s, u) {
+    if (u.perfil !== 'ALUNO' || s.status !== 'INDEFERIDA') return '';
+    if (s.novaTentativaId)
+        return `<div class="acoes" style="margin-top:1rem"><a class="btn btn-sec" href="#/s/${esc(s.novaTentativaId)}">Ver nova tentativa</a></div>`;
+    return '<div class="acoes" style="margin-top:1rem"><button type="button" class="btn" id="solicitar-novamente">Solicitar novamente</button></div>';
+}
+
+async function solicitarNovamente(id, botao) {
+    const ok = await modalConfirmar({
+        titulo: 'Solicitar novamente',
+        mensagem: 'Um novo rascunho será criado com os mesmos dados (disciplina de destino e disciplinas cursadas). Os PDFs não são copiados: anexe de novo. Continuar?',
+        textoOk: 'Criar rascunho'
+    });
+    if (!ok) return;
+    botao.disabled = true;
+    try {
+        const nova = await api(`/${id}/nova-tentativa`, { method: 'POST', ctx: 'solicitacao' });
+        navegar(`#/s/${nova.id}/editar`, 'Rascunho criado. Revise os dados, anexe o PDF e envie.', true);
+    } catch (e) {
+        if (e.status === 409 && e.corpo && e.corpo.novaTentativaId)
+            return navegar('#/s/' + e.corpo.novaTentativaId, 'Esta solicitação já tem uma nova tentativa.');
+        erro(e);
+        botao.disabled = false;
+    }
 }
 
 async function executarAcao(id, acao, botao, solicitacao) {

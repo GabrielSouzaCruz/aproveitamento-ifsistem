@@ -13,6 +13,7 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Solicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.StatusSolicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.AnexoService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.FluxoStatusService;
+import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.NovaTentativaJaExisteException;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.ParecerIaService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.SolicitacaoService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.VerificacaoAnexoService;
@@ -131,6 +132,23 @@ public class AproveitamentoController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Perfil sem permissao para regerar o parecer");
         parecerIa.regerar(id);
         return ResponseEntity.accepted().build();
+    }
+
+    /** Aluno dono, a partir de INDEFERIDA: cria um novo RASCUNHO com os mesmos dados (sem anexos). */
+    @PostMapping("/{id}/nova-tentativa")
+    public ResponseEntity<SolicitacaoResumo> novaTentativa(@PathVariable UUID id) {
+        Usuario usuario = usuarioAtual();
+        if (usuario.perfil() != Perfil.ALUNO)
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Apenas o aluno dono pode solicitar novamente");
+        Solicitacao criada = solicitacoes.novaTentativa(id, usuario.id());
+        return ResponseEntity.created(URI.create("/aproveitamentos/" + criada.getId()))
+                .body(SolicitacaoResumo.de(criada));
+    }
+
+    @ExceptionHandler(NovaTentativaJaExisteException.class)
+    public ResponseEntity<Map<String, Object>> novaTentativaJaExiste(NovaTentativaJaExisteException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("erro", e.getMessage(), "novaTentativaId", e.getNovaTentativaId()));
     }
 
     @PostMapping("/{id}/{acao}")

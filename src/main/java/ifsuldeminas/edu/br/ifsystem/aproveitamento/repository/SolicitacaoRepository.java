@@ -17,5 +17,7 @@ public interface SolicitacaoRepository extends JpaRepository<Solicitacao, UUID> 
 
     List<Solicitacao> findByAlunoId(UUID alunoId);
 
+    Optional<Solicitacao> findBySolicitacaoOrigemId(UUID origemId);
+
     List<Solicitacao> findByStatus(StatusSolicitacao status);
 }

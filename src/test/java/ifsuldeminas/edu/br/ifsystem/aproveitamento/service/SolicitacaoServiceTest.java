@@ -397,4 +397,101 @@ class SolicitacaoServiceTest {
         assertThat(d.cursoId()).isNull();
         assertThat(d.ementaDestino()).isNull();
     }
+
+    // ---------- nova tentativa ----------
+
+    private Solicitacao indeferidaComCursada(UUID aluno) {
+        DisciplinaCurso destino = disciplinaDoCatalogo();
+        Solicitacao origem = tem.persist(new Solicitacao(aluno, destino));
+        origem.alterarStatus(StatusSolicitacao.INDEFERIDA);
+        tem.persist(new DisciplinaCursada(origem, "BD I", "UFLA", 40, "ementa de origem"));
+        tem.persist(new Anexo(origem, "hist.pdf", "application/pdf", 10L));
+        tem.persist(new HistoricoStatus(origem, StatusSolicitacao.ANALISE, StatusSolicitacao.INDEFERIDA,
+                UUID.randomUUID(), "Carga horaria insuficiente"));
+        sincronizar();
+        return origem;
+    }
+
+    private static void assertStatus(Runnable r, HttpStatus esperado) {
+        assertThatThrownBy(r::run).isInstanceOfSatisfying(ResponseStatusException.class,
+                e -> assertThat(e.getStatusCode()).isEqualTo(esperado));
+    }
+
+    @Test
+    void novaTentativaCopiaDadosSemAnexosEGravaHistorico() {
+        UUID aluno = UUID.randomUUID();
+        Solicitacao origem = indeferidaComCursada(aluno);
+
+        Solicitacao nova = service.novaTentativa(origem.getId(), aluno);
+        sincronizar();
+
+        Solicitacao salva = tem.find(Solicitacao.class, nova.getId());
+        assertThat(salva.getStatus()).isEqualTo(StatusSolicitacao.RASCUNHO);
+        assertThat(salva.getSolicitacaoOrigem().getId()).isEqualTo(origem.getId());
+        assertThat(salva.getDisciplinaCursoDestino().getId()).isEqualTo(origem.getDisciplinaCursoDestino().getId());
+        assertThat(salva.getDisciplinaDestino()).isEqualTo("Banco de Dados");
+        assertThat(salva.getCargaHorariaDestino()).isEqualTo(60);
+
+        assertThat(tem.getEntityManager()
+                .createQuery("select d from DisciplinaCursada d where d.solicitacao.id = :id", DisciplinaCursada.class)
+                .setParameter("id", nova.getId()).getResultList())
+                .extracting(DisciplinaCursada::getNome, DisciplinaCursada::getEmenta)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("BD I", "ementa de origem"));
+        assertThat(tem.getEntityManager()
+                .createQuery("select a from Anexo a where a.solicitacao.id = :id", Anexo.class)
+                .setParameter("id", nova.getId()).getResultList()).isEmpty();
+        assertThat(tem.getEntityManager()
+                .createQuery("select h from HistoricoStatus h where h.solicitacao.id = :id", HistoricoStatus.class)
+                .setParameter("id", nova.getId()).getResultList())
+                .singleElement().satisfies(h -> {
+                    assertThat(h.getStatusAnterior()).isNull();
+                    assertThat(h.getStatusNovo()).isEqualTo(StatusSolicitacao.RASCUNHO);
+                    assertThat(h.getObservacao()).isEqualTo("Nova tentativa de #" + origem.getId().toString().substring(0, 8));
+                });
+    }
+
+    @Test
+    void novaTentativaDeOrigemEmOutroStatusDa409() {
+        UUID aluno = UUID.randomUUID();
+        Solicitacao s = persistir(aluno, StatusSolicitacao.DEFERIDA);
+        sincronizar();
+
+        assertStatus(() -> service.novaTentativa(s.getId(), aluno), HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void novaTentativaDeOutroAlunoDa403() {
+        Solicitacao origem = indeferidaComCursada(UUID.randomUUID());
+
+        assertStatus(() -> service.novaTentativa(origem.getId(), UUID.randomUUID()), HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void segundaNovaTentativaLancaConflitoComIdDaPrimeira() {
+        UUID aluno = UUID.randomUUID();
+        Solicitacao origem = indeferidaComCursada(aluno);
+        Solicitacao primeira = service.novaTentativa(origem.getId(), aluno);
+        sincronizar();
+
+        assertThatThrownBy(() -> service.novaTentativa(origem.getId(), aluno))
+                .isInstanceOfSatisfying(NovaTentativaJaExisteException.class,
+                        e -> assertThat(e.getNovaTentativaId()).isEqualTo(primeira.getId()));
+    }
+
+    @Test
+    void detalheTrazOrigemNovaTentativaEMotivo() {
+        UUID aluno = UUID.randomUUID();
+        Solicitacao origem = indeferidaComCursada(aluno);
+        Solicitacao nova = service.novaTentativa(origem.getId(), aluno);
+        sincronizar();
+
+        SolicitacaoDetalhe daNova = service.detalhar(nova.getId(), aluno, Perfil.ALUNO);
+        assertThat(daNova.solicitacaoOrigemId()).isEqualTo(origem.getId());
+        assertThat(daNova.motivoIndeferimentoOrigem()).isEqualTo("Carga horaria insuficiente");
+        assertThat(daNova.novaTentativaId()).isNull();
+
+        SolicitacaoDetalhe daOrigem = service.detalhar(origem.getId(), aluno, Perfil.ALUNO);
+        assertThat(daOrigem.novaTentativaId()).isEqualTo(nova.getId());
+        assertThat(daOrigem.solicitacaoOrigemId()).isNull();
+    }
 }

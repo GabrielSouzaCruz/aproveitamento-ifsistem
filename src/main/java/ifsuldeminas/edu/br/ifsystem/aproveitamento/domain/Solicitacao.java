@@ -35,6 +35,10 @@ public class Solicitacao {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "disciplina_destino_id")
     private DisciplinaCurso disciplinaCursoDestino;
+    /** Solicitacao indeferida da qual esta e uma nova tentativa; nula nas demais. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "solicitacao_origem_id")
+    private Solicitacao solicitacaoOrigem;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StatusSolicitacao status;
@@ -64,6 +68,15 @@ public class Solicitacao {
         this.disciplinaCursoDestino = destino;
     }
 
+    /** Nova tentativa de {@code origem}: copia o destino (FK e textos) e aponta para a original. */
+    public static Solicitacao novaTentativa(Solicitacao origem) {
+        Solicitacao n = new Solicitacao(origem.alunoId, origem.curso, origem.disciplinaDestino,
+                origem.cargaHorariaDestino);
+        n.disciplinaCursoDestino = origem.disciplinaCursoDestino;
+        n.solicitacaoOrigem = origem;
+        return n;
+    }
+
     @PreUpdate
     void atualizarData() {
         atualizadoEm = OffsetDateTime.now();
@@ -91,6 +104,10 @@ public class Solicitacao {
 
     public DisciplinaCurso getDisciplinaCursoDestino() {
         return disciplinaCursoDestino;
+    }
+
+    public Solicitacao getSolicitacaoOrigem() {
+        return solicitacaoOrigem;
     }
 
     public StatusSolicitacao getStatus() {
