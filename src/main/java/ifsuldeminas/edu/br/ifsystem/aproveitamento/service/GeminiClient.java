@@ -12,6 +12,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 
@@ -26,6 +27,8 @@ public class GeminiClient {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
     static final JsonMapper JSON = JsonMapper.builder().build();
+    /** Sem charset explicito o Spring codificaria/decodificaria como ISO-8859-1 e os acentos se perderiam. */
+    private static final MediaType JSON_UTF8 = new MediaType("application", "json", StandardCharsets.UTF_8);
 
     private final RestClient client;
     private final String modelo;
@@ -79,11 +82,11 @@ public class GeminiClient {
 
     private String chamar(String corpo) {
         try {
-            String resposta = client.post().uri("/v1beta/models/{modelo}:generateContent", modelo)
-                    .contentType(MediaType.APPLICATION_JSON).body(corpo).retrieve().body(String.class);
-            if (resposta == null)
+            byte[] bytes = client.post().uri("/v1beta/models/{modelo}:generateContent", modelo)
+                    .contentType(JSON_UTF8).body(corpo.getBytes(StandardCharsets.UTF_8)).retrieve().body(byte[].class);
+            if (bytes == null)
                 throw new FalhaGemini("resposta vazia", false);
-            return resposta;
+            return new String(bytes, StandardCharsets.UTF_8); // UTF-8 explicito, independente do Content-Type da resposta
         } catch (RestClientResponseException e) {
             int status = e.getStatusCode().value();
             throw new FalhaGemini("HTTP " + status, status == 429 || status >= 500);

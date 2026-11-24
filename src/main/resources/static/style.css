@@ -285,8 +285,6 @@ td.seta { width: 1%; color: var(--texto-sec); }
 .rec-INCONCLUSIVO { color: var(--atencao-texto); }
 .barra { height: 10px; background: var(--superficie); border-radius: 999px; overflow: hidden; margin: .4rem 0 1rem; }
 .barra > span { display: block; height: 100%; background: var(--verde-vivo); border-radius: 999px; transition: width .5s; }
-.barra.baixa > span { background: var(--erro); }
-.barra.media > span { background: var(--atencao); }
 .parecer p { max-width: 70ch; }
 .carregando::after {
     content: ""; display: inline-block; width: 12px; height: 12px; margin-left: .5rem; vertical-align: middle;
@@ -353,3 +351,13 @@ details.cursada summary { cursor: pointer; font-size: 14px; }
 .anexos li .anexo-motivo { flex-basis: 100%; margin: 0; }
 .anexos li .aviso-anexo { color: var(--erro-texto); font-weight: 600; }
 .acoes-anexo { align-items: center; flex-wrap: wrap; }
+
+/* Cor do card do parecer conforme a recomendacao (a barra de similaridade acompanha) */
+.parecer-deferir { background: #F0FDF4; border-color: #86EFAC; }
+.parecer-deferir .barra > span { background: var(--verde-acao); }
+.parecer-indeferir { background: #FDECEC; border-color: #F0A3A5; }
+.parecer-indeferir .rec { color: #CD191E; }
+.parecer-indeferir .barra > span { background: #CD191E; }
+.parecer-inconclusivo { background: #FEF9E1; border-color: #F5D565; }
+.parecer-inconclusivo .barra > span { background: var(--atencao); }
+.rodape-modelo { font-size: 11px; margin: .5rem 0 0; }

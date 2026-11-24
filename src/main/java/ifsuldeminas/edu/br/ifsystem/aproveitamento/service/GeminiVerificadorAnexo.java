@@ -121,6 +121,7 @@ public class GeminiVerificadorAnexo implements VerificadorAnexo {
                 2. o nome da disciplina no documento bate com o informado;
                 3. a carga horária do documento confere com a informada;
                 4. o conteúdo é coerente com a ementa digitada pelo aluno.
+                Escreva em português do Brasil com acentuação correta.
                 Responda somente em JSON com os campos:
                 - tipoDetectado: EMENTA, HISTORICO ou OUTRO;
                 - status: VALIDO (todos os critérios atendidos), INVALIDO (documento claramente errado ou sem relação com a disciplina) ou PRECISA_CONFERIR (dúvida, dados ilegíveis ou critérios parcialmente atendidos);

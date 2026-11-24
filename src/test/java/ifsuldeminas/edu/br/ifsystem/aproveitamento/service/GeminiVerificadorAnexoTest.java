@@ -130,6 +130,24 @@ class GeminiVerificadorAnexoTest {
     }
 
     @Test
+    void acentosDoMotivoChegamIntactos() {
+        server.expect(once(), requestTo(URL)).andRespond(withSuccess(envelope(
+                "{\\\"tipoDetectado\\\":\\\"EMENTA\\\",\\\"status\\\":\\\"VALIDO\\\",\\\"motivo\\\":"
+                        + "\\\"Conteúdo compatível; carga horária confere.\\\"}"), MediaType.APPLICATION_JSON));
+
+        ResultadoVerificacao r = verificador.verificar(comTexto());
+
+        assertThat(r.motivo()).isEqualTo("Conteúdo compatível; carga horária confere.");
+        assertThat(r.modelo()).isEqualTo("gemini-teste");
+    }
+
+    @Test
+    void promptPedeAcentuacaoCorreta() {
+        assertThat(GeminiVerificadorAnexo.prompt(comTexto(), false))
+                .contains("português do Brasil com acentuação correta");
+    }
+
+    @Test
     void motivoLongoETruncadoEm400() {
         String longo = "a".repeat(700);
         server.expect(once(), requestTo(URL)).andRespond(withSuccess(envelope(

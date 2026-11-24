@@ -73,6 +73,7 @@ const MENUS = {
 
 const app = document.getElementById('app');
 let pollingParecer = null;
+const RECOMENDACAO_TOM = { SUGERE_DEFERIR: 'deferir', SUGERE_INDEFERIR: 'indeferir', INCONCLUSIVO: 'inconclusivo' };
 let pollingAnexos = null;
 
 // ---------- Sessao ----------
@@ -685,6 +686,7 @@ async function carregarParecer(id, tentativas = 0) {
     if (!document.getElementById('parecer')) return; // usuario saiu da tela
 
     let corpo;
+    card.className = 'card destaque parecer';
     if (!p) {
         corpo = '<p class="muted">Ainda não há parecer. Ele é gerado automaticamente quando o aluno envia a solicitação.</p>';
     } else if (p.status === 'PROCESSANDO') {
@@ -694,13 +696,16 @@ async function carregarParecer(id, tentativas = 0) {
                  ${p.erro ? `<p class="muted pequeno">${esc(p.erro)}</p>` : ''}`;
     } else {
         const sim = Math.max(0, Math.min(100, p.similaridade ?? 0));
-        const faixa = sim < 50 ? 'baixa' : sim < 75 ? 'media' : '';
+        const tom = RECOMENDACAO_TOM[p.recomendacao] || "neutro";
+        const origem = !p.modelo ? "" : p.modelo.startsWith("heuristica") ? "heurística local" : `gerado por ${p.modelo}`;
+        card.className = `card destaque parecer parecer-${tom}`;
         corpo = `
             <span class="rec rec-${esc(p.recomendacao)}">${esc(RECOMENDACAO_ROTULO[p.recomendacao] || p.recomendacao || '—')}</span>
             <div class="pequeno">Similaridade de conteúdo: <strong>${sim}%</strong></div>
-            <div class="barra ${faixa}" role="progressbar" aria-valuenow="${sim}" aria-valuemin="0" aria-valuemax="100" aria-label="Similaridade"><span style="width:${sim}%"></span></div>
+            <div class="barra" role="progressbar" aria-valuenow="${sim}" aria-valuemin="0" aria-valuemax="100" aria-label="Similaridade"><span style="width:${sim}%"></span></div>
             <p>${esc(p.justificativa || '')}</p>
-            <p class="muted pequeno" style="margin-bottom:0">Gerado em ${data(p.geradoEm)}. Sugestão de apoio: a decisão é do coordenador.</p>`;
+            <p class="muted pequeno" style="margin-bottom:0">Gerado em ${data(p.geradoEm)}. Sugestão de apoio: a decisão é do coordenador.</p>
+            ${origem ? `<p class="muted rodape-modelo">${esc(origem)}</p>` : ""}`;
     }
     card.innerHTML = cabecalhoParecer() + corpo;
     const btn = card.querySelector('#btn-regerar');
