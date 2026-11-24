@@ -25,3 +25,5 @@ services:
         value: "false"
       - key: JAVA_OPTS
         value: -XX:MaxRAMPercentage=75
+      - key: PORTAL_URL
+        sync: false
