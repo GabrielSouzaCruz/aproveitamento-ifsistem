@@ -737,4 +737,58 @@ class AproveitamentoControllerTest {
         mvc.perform(como(post("/aproveitamentos/{id}/anexos/{anexo}/reverificar", solicitacaoId, anexoId),
                         servidor, Perfil.SERVIDOR)).andExpect(status().isNotFound());
     }
+
+    // ---------- POST nova-tentativa ----------
+
+    @Test
+    void novaTentativaRetorna201() throws Exception {
+        UUID novaId = UUID.randomUUID();
+        Solicitacao nova = new Solicitacao(aluno, "ADS", "Banco de Dados", 60);
+        ReflectionTestUtils.setField(nova, "id", novaId);
+        when(solicitacoes.novaTentativa(solicitacaoId, aluno)).thenReturn(nova);
+
+        mvc.perform(como(post("/aproveitamentos/{id}/nova-tentativa", solicitacaoId), aluno, Perfil.ALUNO))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/aproveitamentos/" + novaId))
+                .andExpect(jsonPath("$.id").value(novaId.toString()))
+                .andExpect(jsonPath("$.status").value("RASCUNHO"));
+        verify(fluxo, never()).executar(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void novaTentativaDeOutroAlunoRetorna403() throws Exception {
+        when(solicitacoes.novaTentativa(solicitacaoId, aluno))
+                .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN));
+
+        mvc.perform(como(post("/aproveitamentos/{id}/nova-tentativa", solicitacaoId), aluno, Perfil.ALUNO))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void novaTentativaPorServidorRetorna403() throws Exception {
+        mvc.perform(como(post("/aproveitamentos/{id}/nova-tentativa", solicitacaoId), servidor, Perfil.SERVIDOR))
+                .andExpect(status().isForbidden());
+        verify(solicitacoes, never()).novaTentativa(any(), any());
+    }
+
+    @Test
+    void novaTentativaForaDeIndeferidaRetorna409() throws Exception {
+        when(solicitacoes.novaTentativa(solicitacaoId, aluno))
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT));
+
+        mvc.perform(como(post("/aproveitamentos/{id}/nova-tentativa", solicitacaoId), aluno, Perfil.ALUNO))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void segundaNovaTentativaRetorna409ComIdDaExistente() throws Exception {
+        UUID existente = UUID.randomUUID();
+        when(solicitacoes.novaTentativa(solicitacaoId, aluno))
+                .thenThrow(new ifsuldeminas.edu.br.ifsystem.aproveitamento.service.NovaTentativaJaExisteException(existente));
+
+        mvc.perform(como(post("/aproveitamentos/{id}/nova-tentativa", solicitacaoId), aluno, Perfil.ALUNO))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.erro").value("Já existe uma nova tentativa para esta solicitação"))
+                .andExpect(jsonPath("$.novaTentativaId").value(existente.toString()));
+    }
 }

@@ -87,6 +87,31 @@ public class SolicitacaoService {
         return solicitacoes.saveAndFlush(s);
     }
 
+    /**
+     * Cria um RASCUNHO a partir de uma solicitacao INDEFERIDA: copia destino e disciplinas cursadas (com ementa),
+     * sem anexos. Uma unica nova tentativa por indeferimento; o aluno dono e exigido (403).
+     */
+    @Transactional
+    public Solicitacao novaTentativa(UUID origemId, UUID alunoId) {
+        Solicitacao origem = buscar(origemId);
+        if (!origem.getAlunoId().equals(alunoId))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solicitacao pertence a outro aluno");
+        if (origem.getStatus() != StatusSolicitacao.INDEFERIDA)
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Nova tentativa so a partir de solicitacao INDEFERIDA (status atual: " + origem.getStatus() + ")");
+        solicitacoes.findBySolicitacaoOrigemId(origemId).ifPresent(e -> {
+            throw new NovaTentativaJaExisteException(e.getId());
+        });
+        Solicitacao nova = solicitacoes.save(Solicitacao.novaTentativa(origem));
+        for (DisciplinaCursada c : disciplinas.findBySolicitacaoId(origemId)) {
+            disciplinas.save(new DisciplinaCursada(nova, c.getNome(), c.getInstituicao(), c.getCargaHoraria(),
+                    c.getEmenta()));
+        }
+        historicos.save(new HistoricoStatus(nova, null, StatusSolicitacao.RASCUNHO, alunoId,
+                "Nova tentativa de #" + origemId.toString().substring(0, 8)));
+        return nova;
+    }
+
     private DisciplinaCurso destinoAtivo(UUID disciplinaDestinoId) {
         return catalogo.findById(disciplinaDestinoId)
                 .filter(x -> x.isAtivo() && x.getCurso().isAtivo())
@@ -99,11 +124,18 @@ public class SolicitacaoService {
     public SolicitacaoDetalhe detalhar(UUID id, UUID usuarioId, Perfil perfil) {
         Solicitacao s = buscar(id);
         boolean podeDecidir = perfil == Perfil.PROFESSOR && coordenadores.coordena(usuarioId, s);
+        Solicitacao origem = s.getSolicitacaoOrigem();
+        UUID origemId = origem == null ? null : origem.getId();
+        String motivo = origemId == null ? null : historicos.findBySolicitacaoIdOrderByCriadoEmAsc(origemId).stream()
+                .filter(h -> h.getStatusNovo() == StatusSolicitacao.INDEFERIDA)
+                .reduce((a, b) -> b).map(HistoricoStatus::getObservacao).orElse(null);
+        UUID novaId = solicitacoes.findBySolicitacaoOrigemId(id).map(Solicitacao::getId).orElse(null);
         return SolicitacaoDetalhe.de(s,
                 disciplinas.findBySolicitacaoId(id),
                 anexos.findBySolicitacaoId(id),
                 preDiagnosticos.findBySolicitacaoId(id).orElse(null),
-                podeDecidir, perfil != Perfil.ALUNO);
+                podeDecidir, perfil != Perfil.ALUNO)
+                .comOrigem(origemId, novaId, motivo);
     }
 
     @Transactional(readOnly = true)

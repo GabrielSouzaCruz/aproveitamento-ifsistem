@@ -385,3 +385,7 @@ details.cursada summary { cursor: pointer; font-size: 14px; }
 .modal .btn-perigo-cheio { background: #b91c1c; color: #fff; }
 .modal .btn-perigo-cheio:hover { background: #991b1b; }
 .modal .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.selo-nova { display: inline-block; font-size: 12px; font-weight: 700; padding: .1rem .5rem; border-radius: 999px; background: var(--menta); color: var(--verde-hover); margin-right: .4rem; }
+.nota-origem { border: 1px solid var(--borda-verde); border-left: 4px solid var(--verde-acao); background: var(--menta); border-radius: 8px; padding: .8rem 1rem; margin-bottom: 1rem; }
+.nota-origem p { margin: .3rem 0; }

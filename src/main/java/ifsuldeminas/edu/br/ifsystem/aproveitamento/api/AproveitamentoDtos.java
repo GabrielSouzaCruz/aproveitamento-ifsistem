@@ -56,10 +56,17 @@ public final class AproveitamentoDtos {
     // ---------- Saida ----------
 
     public record SolicitacaoResumo(UUID id, UUID alunoId, String curso, String disciplinaDestino,
-                                    StatusSolicitacao status, OffsetDateTime atualizadoEm) {
+                                    StatusSolicitacao status, OffsetDateTime atualizadoEm,
+                                    UUID solicitacaoOrigemId) {
+        public SolicitacaoResumo(UUID id, UUID alunoId, String curso, String disciplinaDestino,
+                                 StatusSolicitacao status, OffsetDateTime atualizadoEm) {
+            this(id, alunoId, curso, disciplinaDestino, status, atualizadoEm, null);
+        }
+
         public static SolicitacaoResumo de(Solicitacao s) {
             return new SolicitacaoResumo(s.getId(), s.getAlunoId(), s.getCurso(), s.getDisciplinaDestino(),
-                    s.getStatus(), s.getAtualizadoEm());
+                    s.getStatus(), s.getAtualizadoEm(),
+                    s.getSolicitacaoOrigem() == null ? null : s.getSolicitacaoOrigem().getId());
         }
     }
 
@@ -106,7 +113,16 @@ public final class AproveitamentoDtos {
                                      List<DisciplinaCursadaResposta> disciplinas,
                                      List<AnexoResposta> anexos,
                                      PreDiagnosticoResposta preDiagnostico,
-                                     boolean podeDecidir) {
+                                     boolean podeDecidir,
+                                     UUID solicitacaoOrigemId, UUID novaTentativaId,
+                                     String motivoIndeferimentoOrigem) {
+        /** Preenche os dados de "solicitar novamente": origem desta, tentativa seguinte e motivo do indeferimento. */
+        public SolicitacaoDetalhe comOrigem(UUID origemId, UUID novaId, String motivo) {
+            return new SolicitacaoDetalhe(id, alunoId, curso, cursoId, disciplinaDestino, cargaHorariaDestino,
+                    ementaDestino, status, criadoEm, atualizadoEm, disciplinas, anexos, preDiagnostico,
+                    podeDecidir, origemId, novaId, motivo);
+        }
+
         public static SolicitacaoDetalhe de(Solicitacao s, List<DisciplinaCursada> disciplinas,
                                             List<Anexo> anexos, PreDiagnostico preDiagnostico) {
             return de(s, disciplinas, anexos, preDiagnostico, false);
@@ -129,7 +145,7 @@ public final class AproveitamentoDtos {
                     disciplinas.stream().map(DisciplinaCursadaResposta::de).toList(),
                     anexos.stream().map(a -> AnexoResposta.de(a, verMotivoAnexos)).toList(),
                     preDiagnostico == null ? null : PreDiagnosticoResposta.de(preDiagnostico),
-                    podeDecidir);
+                    podeDecidir, null, null, null);
         }
     }
 

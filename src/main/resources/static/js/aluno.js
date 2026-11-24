@@ -38,6 +38,7 @@ async function telaNova(editarId) {
 
     app.innerHTML = `
         <a class="voltar" href="${edicao ? '#/s/' + esc(editarId) : '#/'}">${ICONES.voltar} Voltar</a>
+        ${atual ? blocoOrigem(atual, usuarioAtual()) : ''}
         <form id="form-nova" class="card">
             <h3>Disciplina que deseja aproveitar</h3>
             <div class="campos-2">
