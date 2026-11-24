@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Entrando · IF Conect</title>
+    <link rel="icon" type="image/png" href="img/favicon.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="sem-sessao">
+<div class="layout">
+    <div class="principal">
+        <main class="conteudo">
+            <section class="login">
+                <img class="logo-completa" src="img/logo-ifconect.png" alt="IF Conect" width="302" height="230">
+                <p id="msg" class="muted" role="status">Entrando…</p>
+                <a id="voltar" class="btn" href="login.html" hidden>Tentar de novo</a>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="js/sso.js"></script>
+<script>
+    ssoPronto
+        .then(() => IfsistemSSO.handleCallback())
+        .then(() => location.replace('aproveitamento.html'))
+        .catch(e => {
+            document.getElementById('msg').textContent = e.message;
+            document.getElementById('voltar').hidden = false;
+        });
+</script>
+</body>
+</html>
