@@ -432,7 +432,7 @@ function linhaSolicitacao(u, s) {
             <td data-rotulo="Curso">${esc(s.curso)}</td>
             <td data-rotulo="Status">${statusBadge(s.status)}</td>
             <td data-rotulo="Atualizada">${data(s.atualizadoEm)}</td>
-            <td class="seta">${rapidas.length
+            <td class="seta${rapidas.length ? ' celula-acoes' : ''}">${rapidas.length
                 ? `<span class="acoes-linha">${rapidas.map(a => `<button type="button" class="btn btn-mini ${a.perigo ? 'btn-perigo' : ''}" data-rapida="${a.acao}">${esc(a.acao === 'conferir' ? 'Conferir' : 'Devolver')}</button>`).join('')}</span>`
                 : ICONES.seta}</td>
         </tr>`;
