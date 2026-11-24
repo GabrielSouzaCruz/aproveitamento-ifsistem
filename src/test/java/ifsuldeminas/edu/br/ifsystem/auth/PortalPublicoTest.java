@@ -7,6 +7,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -17,11 +18,22 @@ class PortalPublicoTest {
     private MockMvc mvc;
 
     @Test
-    void portalEModulosSaoPublicos() throws Exception {
-        for (String caminho : new String[]{"/", "/index.html", "/portal.js", "/modulos.json",
-                "/login.html", "/aproveitamento.html"}) {
+    void raizELoginSaoPublicos() throws Exception {
+        for (String caminho : new String[]{"/", "/login.html", "/aproveitamento.html"}) {
             mvc.perform(get(caminho)).andExpect(status().isOk());
         }
+    }
+
+    @Test
+    void configEPublicoEDevolvePortalUrl() throws Exception {
+        mvc.perform(get("/config")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.portalUrl").value("#"));
+    }
+
+    @Test
+    void portalInternoFoiRemovido() throws Exception {
+        mvc.perform(get("/portal.js")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/modulos.json")).andExpect(status().isUnauthorized());
     }
 
     @Test
