@@ -197,6 +197,13 @@ function acoesDisponiveis(perfil, status) {
     return ACOES.filter(a => a.perfil === perfil && a.origens.includes(status));
 }
 
+/** Fila "Aguardando minha ação": só quem tem ação possível agora; estados finais nunca entram. */
+function aguardaAcao(u, s) {
+    if (STATUS_FINAIS.includes(s.status)) return false;
+    if (u.perfil === 'PROFESSOR' && s.podeDecidir === false) return false;
+    return acoesDisponiveis(u.perfil, s.status).length > 0;
+}
+
 const aviso = document.getElementById('aviso');
 let avisoTimer = null;
 
@@ -340,10 +347,10 @@ async function telaLista() {
         comFiltros ? http('/cursos') : Promise.resolve([])
     ]);
     todas.sort((a, b) => (b.atualizadoEm || '').localeCompare(a.atualizadoEm || ''));
-    const aguardando = todas.filter(s => acoesDisponiveis(u.perfil, s.status).length > 0).length;
+    const aguardando = todas.filter(s => aguardaAcao(u, s)).length;
     const concluidas = todas.filter(s => STATUS_FINAIS.includes(s.status)).length;
     const lista = comFiltros && filtrosLista.status === FILTRO_ACAO
-        ? todas.filter(s => acoesDisponiveis(u.perfil, s.status).length > 0) : todas;
+        ? todas.filter(s => aguardaAcao(u, s)) : todas;
     const agora = new Date();
     const mes = agora.toLocaleDateString('pt-BR', { month: 'long' });
 
@@ -418,7 +425,7 @@ function linhaSolicitacao(u, s) {
     return `
         <tr class="clicavel" data-id="${esc(s.id)}" tabindex="0">
             <td data-rotulo="Disciplina"><strong>${esc(s.disciplinaDestino)}</strong>
-                ${acoes.length ? '<span class="sub">Aguarda sua ação</span>' : ''}</td>
+                ${aguardaAcao(u, s) ? '<span class="sub">Aguarda sua ação</span>' : ''}</td>
             <td data-rotulo="Curso">${esc(s.curso)}</td>
             <td data-rotulo="Status">${statusBadge(s.status)}</td>
             <td data-rotulo="Atualizada">${data(s.atualizadoEm)}</td>
@@ -428,11 +435,24 @@ function linhaSolicitacao(u, s) {
         </tr>`;
 }
 
+/** Modal de observacao da acao; null = cancelou, '' = sem observacao (so nas opcionais). */
+async function pedirObservacao(acao) {
+    const cfg = {
+        'devolver-pendencia': { titulo: 'Devolver para o aluno', rotulo: 'Motivo da pendência (o aluno verá no histórico)',
+            obrigatorio: true, textoOk: 'Devolver', perigo: true },
+        'indeferir': { titulo: 'Indeferir solicitação', rotulo: 'Motivo do indeferimento',
+            obrigatorio: true, textoOk: 'Indeferir', perigo: true },
+        'deferir': { titulo: 'Deferir solicitação', rotulo: 'Observação', obrigatorio: false, textoOk: 'Deferir' }
+    }[acao];
+    if (!cfg) return '';
+    return modalTexto({ ...cfg, placeholder: 'Registrada no histórico junto com a ação', maxLength: 2000 });
+}
+
 async function acaoRapida(id, acao, botao) {
     let observacao = null;
     if (acao === 'devolver-pendencia') {
-        observacao = (prompt('Motivo da pendência (o aluno verá no histórico):') || '').trim();
-        if (!observacao) return mostrarAviso('Informe o motivo da pendência para devolver a solicitação.');
+        observacao = await pedirObservacao(acao);
+        if (observacao === null) return;
     }
     botao.disabled = true;
     try {
@@ -477,7 +497,7 @@ async function telaDetalhe(id) {
             ${podeEditar ? `<div class="acoes" style="margin-top:1rem"><a class="btn btn-sec" href="#/s/${esc(id)}/editar">Editar</a></div>` : ''}
             ${acoes.length ? `
                 <div class="campo" style="margin-top:1.25rem">
-                    <label for="obs">Observação ${acoes.some(a => a.acao === 'devolver-pendencia') ? '(obrigatória ao devolver pendência)' : '(opcional)'}</label>
+                    <label for="obs">Observação (opcional)</label>
                     <textarea id="obs" rows="2" maxlength="2000" placeholder="Registrada no histórico junto com a ação"></textarea>
                 </div>
                 <div class="acoes">
@@ -542,11 +562,14 @@ async function telaDetalhe(id) {
 
 async function executarAcao(id, acao, botao, solicitacao) {
     const obs = document.getElementById('obs');
-    const observacao = obs && obs.value.trim() ? obs.value.trim() : null;
-    if (acao === 'devolver-pendencia' && !observacao)
-        return mostrarAviso('Informe na observação o motivo da pendência para devolver a solicitação.');
+    let observacao = obs && obs.value.trim() ? obs.value.trim() : null;
+    if (['devolver-pendencia', 'indeferir', 'deferir'].includes(acao)) {
+        const texto = await pedirObservacao(acao);
+        if (texto === null) return;
+        observacao = texto || null;
+    }
     if (acao === 'enviar' && solicitacao.anexos.length === 0
-        && !confirm('Nenhum PDF foi anexado. Enviar a solicitação mesmo assim?')) return;
+        && !(await modalConfirmar({ titulo: 'Enviar sem PDF', mensagem: 'Nenhum PDF foi anexado. Enviar a solicitação mesmo assim?', textoOk: 'Enviar' }))) return;
     app.querySelectorAll('[data-acao]').forEach(b => b.disabled = true);
     try {
         const r = await api(`/${id}/${acao}`, { method: 'POST', json: observacao ? { observacao } : {}, acao: true });
@@ -662,7 +685,7 @@ async function baixarAnexo(id, anexoId, nome) {
 }
 
 async function removerAnexo(id, anexoId) {
-    if (!confirm('Remover este anexo?')) return;
+    if (!(await modalConfirmar({ titulo: 'Remover anexo', mensagem: 'Remover este anexo?', textoOk: 'Remover', perigo: true }))) return;
     try {
         await api(`/${id}/anexos/${anexoId}`, { method: 'DELETE' });
         await telaDetalhe(id);

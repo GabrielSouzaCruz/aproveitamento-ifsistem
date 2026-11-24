@@ -44,7 +44,7 @@ public class DemoSeed implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(DemoSeed.class);
 
     public static final String CURSO_CODIGO = "TADS";
-    public static final String CURSO = "Tecnologia em Analise e Desenvolvimento de Sistemas";
+    public static final String CURSO = "Tecnologia em Análise e Desenvolvimento de Sistemas";
     public static final String SENHA = "demo1234";
     public static final String CPF_ALUNO = "52998224725";
     public static final String CPF_SERVIDOR = "11144477735";
@@ -57,17 +57,26 @@ public class DemoSeed implements CommandLineRunner {
     public static final UUID SOLICITACAO_DEFERIDA_ID = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000003");
 
     static final String EMENTA_BANCO_DADOS = "Modelagem de dados: modelo entidade-relacionamento e modelo relacional. "
-            + "Normalizacao de tabelas. Linguagem SQL: criacao de tabelas, consultas, juncoes, funcoes de agregacao "
-            + "e subconsultas. Transacoes e controle de concorrencia. Projeto de banco de dados relacional.";
-    static final String EMENTA_PROGRAMACAO = "Introducao a algoritmos e logica de programacao. Variaveis, tipos de "
-            + "dados e operadores. Estruturas condicionais e estruturas de repeticao. Vetores e matrizes. "
-            + "Funcoes e modularizacao. Resolucao de problemas com programacao estruturada.";
-    static final String EMENTA_ENGENHARIA = "Processo de desenvolvimento de software. Levantamento e analise de "
-            + "requisitos. Modelagem com UML. Metodologias ageis, Scrum e Kanban. Testes de software e controle de "
+            + "Normalização de tabelas. Linguagem SQL: criação de tabelas, consultas, junções, funções de agregação "
+            + "e subconsultas. Transações e controle de concorrência. Projeto de banco de dados relacional.";
+    static final String EMENTA_PROGRAMACAO = "Introdução a algoritmos e lógica de programação. Variáveis, tipos de "
+            + "dados e operadores. Estruturas condicionais e estruturas de repetição. Vetores e matrizes. "
+            + "Funções e modularização. Resolução de problemas com programação estruturada.";
+    static final String EMENTA_ENGENHARIA = "Processo de desenvolvimento de software. Levantamento e análise de "
+            + "requisitos. Modelagem com UML. Metodologias ágeis, Scrum e Kanban. Testes de software e controle de "
             + "versao. Gerenciamento de projetos de software.";
     static final String EMENTA_REDES = "Fundamentos de redes de computadores. Modelo OSI e arquitetura TCP/IP. "
-            + "Enderecamento IP, roteamento e protocolos de transporte. Servicos de rede, DNS e HTTP. "
-            + "Seguranca basica em redes.";
+            + "Endereçamento IP, roteamento e protocolos de transporte. Serviços de rede, DNS e HTTP. "
+            + "Segurança básica em redes.";
+
+    static final String EMENTA_ORIGEM_RASCUNHO = "História da engenharia civil. Resistência dos materiais e estruturas "
+            + "de concreto. Canteiro de obras, orçamento e fiscalização de construções.";
+    static final String EMENTA_ORIGEM_ENVIADA = "História da computação e gerações de computadores. Hardware, "
+            + "periféricos e sistemas operacionais. Uso de editores de texto, planilhas eletrônicas e apresentações. "
+            + "Navegação na internet e correio eletrônico.";
+    static final String EMENTA_ORIGEM_DEFERIDA = "Introdução a algoritmos e lógica de programação. Variáveis, tipos de "
+            + "dados e operadores. Estruturas condicionais e estruturas de repetição. Vetores e matrizes. "
+            + "Funções e modularização. Resolução de problemas com programação estruturada.";
 
     /** Liga o seed: profile "demo" ou app.demo-seed=true (variavel DEMO_SEED). */
     static class Ativado implements Condition {
@@ -112,7 +121,8 @@ public class DemoSeed implements CommandLineRunner {
             jdbc.update("update usuarios set cpf = ?, senha = ? where id = ?", CPF_ALUNO, senha, ALUNO_ID);
             jdbc.update("update usuarios set cpf = ?, senha = ? where id = ?", CPF_SERVIDOR, senha, SERVIDOR_ID);
             jdbc.update("update usuarios set cpf = ?, senha = ? where id = ?", CPF_PROFESSOR, senha, PROFESSOR_ID);
-            log.info("Seed demo ja existe: credenciais demo atualizadas");
+            tx.executeWithoutResult(status -> atualizarTextos());
+            log.info("Seed demo ja existe: credenciais e textos demo atualizados");
             return;
         }
         // Uma transacao so: ou entra tudo, ou nada. Os eventos de envio disparam o parecer apos o commit.
@@ -120,11 +130,42 @@ public class DemoSeed implements CommandLineRunner {
         log.info("Seed demo criado: aluno {}, servidor {}, professor {}", ALUNO_ID, SERVIDOR_ID, PROFESSOR_ID);
     }
 
+    /** Bancos ja semeados (por ID/codigo): corrige nomes e textos para a grafia com acentos. */
+    private void atualizarTextos() {
+        jdbc.update("update usuarios set nome = ? where id = ?", "Ana Aluna Demo", ALUNO_ID);
+        jdbc.update("update usuarios set nome = ? where id = ?", "Sérgio Servidor Demo", SERVIDOR_ID);
+        jdbc.update("update usuarios set nome = ? where id = ?", "Paula Professora Demo", PROFESSOR_ID);
+        jdbc.update("update cursos set nome = ? where codigo = ?", CURSO, CURSO_CODIGO);
+        String[][] catalogoDemo = {
+                {"TADS101", "Algoritmos e Lógica de Programação", EMENTA_PROGRAMACAO},
+                {"TADS201", "Banco de Dados", EMENTA_BANCO_DADOS},
+                {"TADS301", "Engenharia de Software", EMENTA_ENGENHARIA},
+                {"TADS202", "Redes de Computadores", EMENTA_REDES}};
+        for (String[] d : catalogoDemo) {
+            jdbc.update("update disciplinas_curso set nome = ?, ementa = ? where codigo = ? "
+                    + "and curso_id = (select id from cursos where codigo = ?)", d[1], d[2], d[0], CURSO_CODIGO);
+        }
+        // Copia gravada na solicitacao: acompanha o catalogo.
+        jdbc.update("update solicitacoes_aproveitamento set "
+                + "disciplina_destino = (select d.nome from disciplinas_curso d where d.id = disciplina_destino_id), "
+                + "curso = (select c.nome from disciplinas_curso d join cursos c on c.id = d.curso_id "
+                + "where d.id = disciplina_destino_id) where id in (?, ?, ?)",
+                SOLICITACAO_RASCUNHO_ID, SOLICITACAO_ENVIADA_ID, SOLICITACAO_DEFERIDA_ID);
+        Object[][] origens = {
+                {SOLICITACAO_RASCUNHO_ID, "Engenharia de Software I", "Universidade Federal de Lavras", EMENTA_ORIGEM_RASCUNHO},
+                {SOLICITACAO_ENVIADA_ID, "Banco de Dados I", "Universidade Federal de Alfenas", EMENTA_ORIGEM_ENVIADA},
+                {SOLICITACAO_DEFERIDA_ID, "Introdução à Programação", "Universidade Federal de Itajubá", EMENTA_ORIGEM_DEFERIDA}};
+        for (Object[] o : origens) {
+            jdbc.update("update disciplinas_cursadas set nome = ?, instituicao = ?, ementa = ? where solicitacao_id = ?",
+                    o[1], o[2], o[3], o[0]);
+        }
+    }
+
     private void popular() {
         String senha = encoder.encode(SENHA);
         inserirUsuario(ALUNO_ID, "Ana Aluna Demo", CPF_ALUNO, "aluno.demo@ifsuldeminas.edu.br",
                 "DEMO-ALU-001", senha, CURSO_CODIGO, 3, Perfil.ALUNO);
-        inserirUsuario(SERVIDOR_ID, "Sergio Servidor Demo", CPF_SERVIDOR, "servidor.demo@ifsuldeminas.edu.br",
+        inserirUsuario(SERVIDOR_ID, "Sérgio Servidor Demo", CPF_SERVIDOR, "servidor.demo@ifsuldeminas.edu.br",
                 "DEMO-SRV-001", senha, null, null, Perfil.SERVIDOR);
         inserirUsuario(PROFESSOR_ID, "Paula Professora Demo", CPF_PROFESSOR, "professor.demo@ifsuldeminas.edu.br",
                 "DEMO-PRF-001", senha, null, null, Perfil.PROFESSOR);
@@ -132,7 +173,7 @@ public class DemoSeed implements CommandLineRunner {
         Curso tads = cursos.saveAndFlush(new Curso(CURSO_CODIGO, CURSO));
         coordenadores.save(new Coordenador(PROFESSOR_ID, tads));
         DisciplinaCurso programacao = catalogo.saveAndFlush(new DisciplinaCurso(tads, "TADS101",
-                "Algoritmos e Logica de Programacao", 80, EMENTA_PROGRAMACAO));
+                "Algoritmos e Lógica de Programação", 80, EMENTA_PROGRAMACAO));
         DisciplinaCurso bancoDados = catalogo.saveAndFlush(new DisciplinaCurso(tads, "TADS201",
                 "Banco de Dados", 60, EMENTA_BANCO_DADOS));
         DisciplinaCurso engenharia = catalogo.saveAndFlush(new DisciplinaCurso(tads, "TADS301",
@@ -140,29 +181,21 @@ public class DemoSeed implements CommandLineRunner {
         catalogo.saveAndFlush(new DisciplinaCurso(tads, "TADS202", "Redes de Computadores", 60, EMENTA_REDES));
 
         // Rascunho: ementa de origem sobre outro assunto (nao enviado, sem parecer).
-        inserirSolicitacao(SOLICITACAO_RASCUNHO_ID, engenharia,
-                "Engenharia de Software I", "Universidade Federal de Lavras", 72,
-                "Historia da engenharia civil. Resistencia dos materiais e estruturas de concreto. "
-                        + "Canteiro de obras, orcamento e fiscalizacao de construcoes.");
+        inserirSolicitacao(SOLICITACAO_RASCUNHO_ID, engenharia, "Engenharia de Software I",
+                "Universidade Federal de Lavras", 72, EMENTA_ORIGEM_RASCUNHO);
         // Ementa diferente da do catalogo: o parecer sugere indeferir.
-        inserirSolicitacao(SOLICITACAO_ENVIADA_ID, bancoDados,
-                "Banco de Dados I", "Universidade Federal de Alfenas", 64,
-                "Historia da computacao e geracoes de computadores. Hardware, perifericos e sistemas "
-                        + "operacionais. Uso de editores de texto, planilhas eletronicas e apresentacoes. "
-                        + "Navegacao na internet e correio eletronico.");
+        inserirSolicitacao(SOLICITACAO_ENVIADA_ID, bancoDados, "Banco de Dados I",
+                "Universidade Federal de Alfenas", 64, EMENTA_ORIGEM_ENVIADA);
         // Ementa parecida com a do catalogo: o parecer sugere deferir.
-        inserirSolicitacao(SOLICITACAO_DEFERIDA_ID, programacao,
-                "Introducao a Programacao", "Universidade Federal de Itajuba", 80,
-                "Introducao a algoritmos e logica de programacao. Variaveis, tipos de dados e operadores. "
-                        + "Estruturas condicionais e estruturas de repeticao. Vetores e matrizes. "
-                        + "Funcoes e modularizacao. Resolucao de problemas com programacao estruturada.");
+        inserirSolicitacao(SOLICITACAO_DEFERIDA_ID, programacao, "Introdução à Programação",
+                "Universidade Federal de Itajubá", 80, EMENTA_ORIGEM_DEFERIDA);
 
-        fluxo.executar(SOLICITACAO_ENVIADA_ID, "enviar", ALUNO_ID, Perfil.ALUNO, "Envio de demonstracao");
+        fluxo.executar(SOLICITACAO_ENVIADA_ID, "enviar", ALUNO_ID, Perfil.ALUNO, "Envio de demonstração");
 
-        fluxo.executar(SOLICITACAO_DEFERIDA_ID, "enviar", ALUNO_ID, Perfil.ALUNO, "Envio de demonstracao");
-        fluxo.executar(SOLICITACAO_DEFERIDA_ID, "conferir", SERVIDOR_ID, Perfil.SERVIDOR, "Documentacao conferida");
+        fluxo.executar(SOLICITACAO_DEFERIDA_ID, "enviar", ALUNO_ID, Perfil.ALUNO, "Envio de demonstração");
+        fluxo.executar(SOLICITACAO_DEFERIDA_ID, "conferir", SERVIDOR_ID, Perfil.SERVIDOR, "Documentação conferida");
         fluxo.executar(SOLICITACAO_DEFERIDA_ID, "concluir-pre-diagnostico", SERVIDOR_ID, Perfil.SERVIDOR,
-                "Pre-diagnostico concluido");
+                "Pré-diagnóstico concluído");
         fluxo.executar(SOLICITACAO_DEFERIDA_ID, "analisar", PROFESSOR_ID, Perfil.PROFESSOR, "Ementas equivalentes");
         fluxo.executar(SOLICITACAO_DEFERIDA_ID, "deferir", PROFESSOR_ID, Perfil.PROFESSOR, "Aproveitamento deferido");
     }

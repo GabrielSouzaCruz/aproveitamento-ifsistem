@@ -79,7 +79,7 @@ async function telaCursos() {
     };
     document.getElementById('cancelar-curso').onclick = sairDaEdicao;
 
-    app.querySelectorAll('[data-editar]').forEach(b => b.onclick = () => {
+    app.querySelectorAll('[data-editar]').forEach(b => b.onclick = async () => {
         const c = cursos.find(x => x.id === b.dataset.editar);
         editando = c.id;
         codigo.value = c.codigo;
@@ -90,9 +90,9 @@ async function telaCursos() {
         form.scrollIntoView({ behavior: 'smooth' });
         nome.focus();
     });
-    app.querySelectorAll('[data-ativo]').forEach(b => b.onclick = () => {
+    app.querySelectorAll('[data-ativo]').forEach(b => b.onclick = async () => {
         const ativar = b.dataset.novo === 'true';
-        if (!ativar && !confirm('Inativar este curso? Ele deixa de aparecer para novas solicitações.')) return;
+        if (!ativar && !(await modalConfirmar({ titulo: 'Confirmar', mensagem: 'Inativar este curso? Ele deixa de aparecer para novas solicitações.', textoOk: 'Inativar', perigo: true }))) return;
         b.disabled = true;
         escrever(() => http(`/cursos/${b.dataset.ativo}/${ativar ? 'ativar' : 'inativar'}`, { method: 'POST', ctx: 'catalogo' }),
             ativar ? 'Curso ativado.' : 'Curso inativado.', telaCursos).then(ok => { if (!ok) b.disabled = false; });
@@ -175,7 +175,7 @@ async function telaDisciplinas(cursoId) {
     };
     campo('cancelar-disc').onclick = sairDaEdicao;
 
-    app.querySelectorAll('[data-editar]').forEach(b => b.onclick = () => {
+    app.querySelectorAll('[data-editar]').forEach(b => b.onclick = async () => {
         const d = disciplinas.find(x => x.id === b.dataset.editar);
         editando = d.id;
         campo('disc-codigo').value = d.codigo;
@@ -188,9 +188,9 @@ async function telaDisciplinas(cursoId) {
         form.scrollIntoView({ behavior: 'smooth' });
         campo('disc-nome').focus();
     });
-    app.querySelectorAll('[data-ativo]').forEach(b => b.onclick = () => {
+    app.querySelectorAll('[data-ativo]').forEach(b => b.onclick = async () => {
         const ativar = b.dataset.novo === 'true';
-        if (!ativar && !confirm('Inativar esta disciplina? Ela deixa de aparecer para novas solicitações.')) return;
+        if (!ativar && !(await modalConfirmar({ titulo: 'Confirmar', mensagem: 'Inativar esta disciplina? Ela deixa de aparecer para novas solicitações.', textoOk: 'Inativar', perigo: true }))) return;
         b.disabled = true;
         escrever(() => http(`/cursos/${cursoId}/disciplinas/${b.dataset.ativo}/${ativar ? 'ativar' : 'inativar'}`,
                 { method: 'POST', ctx: 'catalogo' }),
@@ -277,8 +277,8 @@ async function telaCoordenadores() {
     const sel = document.getElementById('sel-curso');
     sel.value = cursoCoordSelecionado;
     sel.onchange = () => { cursoCoordSelecionado = sel.value; telaCoordenadores().catch(erro); };
-    app.querySelectorAll('[data-desvincular]').forEach(b => b.onclick = () => {
-        if (!confirm('Desvincular este professor da coordenação do curso?')) return;
+    app.querySelectorAll('[data-desvincular]').forEach(b => b.onclick = async () => {
+        if (!(await modalConfirmar({ titulo: 'Confirmar', mensagem: 'Desvincular este professor da coordenação do curso?', textoOk: 'Desvincular', perigo: true }))) return;
         b.disabled = true;
         escrever(() => http(`/cursos/${cursoCoordSelecionado}/coordenadores`,
                 { method: 'DELETE', json: { professorId: b.dataset.desvincular }, ctx: 'coordenador' }),
@@ -369,9 +369,9 @@ async function telaUsuarios() {
             .replace(/\.(\d{3})(\d)/, '.$1-$2');
     });
 
-    app.querySelectorAll('[data-ativo]').forEach(b => b.onclick = () => {
+    app.querySelectorAll('[data-ativo]').forEach(b => b.onclick = async () => {
         const ativar = b.dataset.novo === 'true';
-        if (!ativar && !confirm('Inativar este usuário? Ele não conseguirá mais entrar no sistema.')) return;
+        if (!ativar && !(await modalConfirmar({ titulo: 'Confirmar', mensagem: 'Inativar este usuário? Ele não conseguirá mais entrar no sistema.', textoOk: 'Inativar', perigo: true }))) return;
         b.disabled = true;
         escrever(() => http(`/usuarios/${b.dataset.ativo}/ativo`, { method: 'PATCH', json: { ativo: ativar }, ctx: 'usuario' }),
             ativar ? 'Usuário ativado.' : 'Usuário inativado.', telaUsuarios).then(ok => { if (!ok) b.disabled = false; });

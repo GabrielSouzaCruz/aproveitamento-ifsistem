@@ -34,6 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DemoSeedTest {
 
     @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired
     private DemoSeed seed;
     @Autowired
     private UsuarioRepository usuarios;
@@ -123,5 +125,21 @@ class DemoSeedTest {
         assertThat(usuarios.count()).isEqualTo(usuariosAntes);
         assertThat(solicitacoes.count()).isEqualTo(solicitacoesAntes);
         assertThat(coordenadores.count()).isEqualTo(coordenadoresAntes);
+    }
+
+    @Test
+    void rodarDeNovoCorrigeNomesSemAcento() {
+        jdbc.update("update cursos set nome = 'Tecnologia em Analise e Desenvolvimento de Sistemas'");
+        jdbc.update("update disciplinas_curso set nome = 'Algoritmos e Logica de Programacao' where codigo = 'TADS101'");
+        jdbc.update("update solicitacoes_aproveitamento set curso = 'x', disciplina_destino = 'y'");
+
+        seed.run();
+
+        assertThat(jdbc.queryForObject("select nome from cursos where codigo = 'TADS'", String.class))
+                .isEqualTo("Tecnologia em Análise e Desenvolvimento de Sistemas");
+        assertThat(jdbc.queryForObject("select nome from disciplinas_curso where codigo = 'TADS101'", String.class))
+                .isEqualTo("Algoritmos e Lógica de Programação");
+        assertThat(jdbc.queryForList("select curso from solicitacoes_aproveitamento", String.class))
+                .containsOnly("Tecnologia em Análise e Desenvolvimento de Sistemas");
     }
 }
