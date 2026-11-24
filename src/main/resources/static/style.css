@@ -361,3 +361,20 @@ details.cursada summary { cursor: pointer; font-size: 14px; }
 .parecer-inconclusivo { background: #FEF9E1; border-color: #F5D565; }
 .parecer-inconclusivo .barra > span { background: var(--atencao); }
 .rodape-modelo { font-size: 11px; margin: .5rem 0 0; }
+
+/* Portal IFSISTEM (publico) */
+.portal-topo { background: #2F9E41; border-bottom: 5px solid #CD191E; padding: 1.25rem 1.5rem; }
+.portal-topo h1 { color: #fff; margin: 0; font-size: 1.5rem; }
+.portal-topo h1 span { font-weight: 600; opacity: .9; }
+.portal-conteudo { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+.portal-intro { color: var(--texto-sec); margin: 0 0 1rem; }
+.portal-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
+.modulo { background: var(--superficie); border: 1px solid var(--borda); border-top: 4px solid #2F9E41; border-radius: var(--raio); padding: 1.25rem; display: flex; flex-direction: column; gap: .5rem; }
+.modulo h2 { font-size: 1.05rem; margin: 0; }
+.modulo p { margin: 0 0 .5rem; flex: 1; }
+.modulo-icone { font-size: 2rem; line-height: 1; }
+.modulo .btn { text-align: center; text-decoration: none; }
+.modulo.inativo { filter: grayscale(1); opacity: .65; border-top-color: #9CA3AF; }
+.selo-breve { align-self: flex-start; background: #CD191E; color: #fff; font-size: 12px; font-weight: 600; padding: .2rem .6rem; border-radius: 999px; }
+.voltar-portal { display: block; font-size: 14px; font-weight: 600; color: var(--verde-acao); text-decoration: none; padding: .5rem 1rem; }
+.lateral .voltar-portal { color: #fff; opacity: .85; padding: .5rem 0; }

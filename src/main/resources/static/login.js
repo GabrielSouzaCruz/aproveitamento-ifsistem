@@ -7,7 +7,7 @@ const aviso = $('aviso');
 const formLogin = $('form-login');
 const formCadastro = $('form-cadastro');
 
-if (sessionStorage.getItem('token')) location.replace('index.html');
+if (sessionStorage.getItem('token')) location.replace('aproveitamento.html');
 
 function mostrarAviso(msg, ok = false) {
     aviso.className = 'aviso' + (ok ? ' ok' : '');
@@ -55,7 +55,7 @@ async function entrar(cpf, senha, botao) {
         sessionStorage.setItem('token', r.dados.token);
         sessionStorage.setItem('expiraEm', r.dados.expiraEm);
         sessionStorage.setItem('usuario', JSON.stringify(r.dados.usuario));
-        location.replace('index.html');
+        location.replace('aproveitamento.html');
     } catch (e) {
         mostrarAviso('Falha de comunicação com o servidor.');
     } finally {
