@@ -15,10 +15,10 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.ParecerIaService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.SolicitacaoService;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.service.VerificacaoAnexoService;
 import ifsuldeminas.edu.br.ifsystem.auth.AuthTestSupport;
-import ifsuldeminas.edu.br.ifsystem.auth.config.SecurityConfig;
-import ifsuldeminas.edu.br.ifsystem.auth.service.JwtService;
+import ifsuldeminas.edu.br.ifsystem.seguranca.SecurityConfig;
+import ifsuldeminas.edu.br.ifsystem.seguranca.UsuarioSincronizador;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
-import ifsuldeminas.edu.br.ifsystem.usuario.service.UsuarioService;
+import ifsuldeminas.edu.br.ifsystem.usuario.service.UsuarioLocalService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -26,6 +26,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
@@ -63,7 +64,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AproveitamentoController.class)
-@Import({SecurityConfig.class, JwtService.class})
+@Import({SecurityConfig.class, UsuarioSincronizador.class})
 class AproveitamentoControllerTest {
 
     @Autowired
@@ -78,11 +79,11 @@ class AproveitamentoControllerTest {
     private ParecerIaService parecerIa;
     @MockitoBean
     private VerificacaoAnexoService verificacao;
-    // JwtService real (gera os tokens dos testes); o filtro JWT consulta o usuario no UsuarioService.
-    @Autowired
-    private JwtService jwtService;
+    // Os tokens dos testes vem de jwt() (spring-security-test); o decoder real nao e usado.
     @MockitoBean
-    private UsuarioService usuarioService;
+    private JwtDecoder jwtDecoder;
+    @MockitoBean
+    private UsuarioLocalService usuarioLocalService;
 
     private final UUID aluno = UUID.randomUUID();
     private final UUID outroAluno = UUID.randomUUID();
@@ -97,10 +98,9 @@ class AproveitamentoControllerTest {
         return s;
     }
 
-    /** Autentica a requisicao como o usuario informado, com um JWT real. */
+    /** Autentica a requisicao como o usuario informado, com um token de teste do auth (jwt()). */
     private <T extends AbstractMockHttpServletRequestBuilder<T>> T como(T req, UUID id, Perfil perfil) {
-        when(usuarioService.buscarAtivo(id)).thenReturn(Optional.of(AuthTestSupport.usuario(id, perfil)));
-        return req.header("Authorization", AuthTestSupport.bearer(jwtService, id, perfil));
+        return req.with(AuthTestSupport.jwt(id, perfil));
     }
 
     private String corpoCriar(UUID alunoId) {

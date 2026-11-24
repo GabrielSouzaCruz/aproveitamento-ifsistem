@@ -10,7 +10,6 @@ import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.CursoRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.DisciplinaCursoRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.ParecerIaRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.SolicitacaoRepository;
-import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
 import ifsuldeminas.edu.br.ifsystem.usuario.repository.UsuarioRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,10 +50,9 @@ class DemoSeedTest {
     private ParecerIaRepository pareceres;
 
     @Test
-    void criaUsuariosCoordenadorESolicitacoesNosStatusEsperados() {
-        assertThat(usuarios.findById(ALUNO_ID)).get().extracting(u -> u.getPerfil()).isEqualTo(Perfil.ALUNO);
-        assertThat(usuarios.findById(SERVIDOR_ID)).get().extracting(u -> u.getPerfil()).isEqualTo(Perfil.SERVIDOR);
-        assertThat(usuarios.findById(PROFESSOR_ID)).get().extracting(u -> u.getPerfil()).isEqualTo(Perfil.PROFESSOR);
+    void naoCriaUsuariosMasCriaCoordenadorESolicitacoesNosStatusEsperados() {
+        // Os usuarios vivem no ifsistem-auth; a copia local entra no primeiro login.
+        assertThat(usuarios.count()).isZero();
         assertThat(coordenadores.existsByProfessorIdAndCursoNome(PROFESSOR_ID, CURSO)).isTrue();
 
         Map<java.util.UUID, StatusSolicitacao> status = solicitacoes.findAll().stream()

@@ -64,13 +64,13 @@ Roteiro para apresentar a aplicação sem Docker: o profile `demo` usa H2 em arq
 2. Abrir o Swagger: http://localhost:8080/swagger-ui.html
 3. (Opcional) Console H2: http://localhost:8080/h2-console. JDBC URL `jdbc:h2:file:./data/demo`, usuário `sa`, senha vazia.
 
-O login é real: abra http://localhost:8080 e entre com CPF e senha (ou crie uma conta de aluno em "Criar conta"). A senha dos usuários demo é `demo1234` (só quando o seed demo está ligado: profile `demo` ou `DEMO_SEED=true`).
+O login é o login único do IFSISTEM (`ifsistem-auth`): abra http://localhost:8080, clique em "Entrar com IFSISTEM" e entre com CPF e senha no auth. Para rodar local, suba o auth na porta 9000 (veja o README dele) e use `AUTH_ISSUER=http://localhost:9000`. O seed demo (profile `demo` ou `DEMO_SEED=true`) **não cria usuários**: usa os IDs fixos abaixo, que são os dos usuários demo já existentes no auth (vieram da migração).
 
-| Perfil | Nome | CPF | Observação |
-|---|---|---|---|
-| `ALUNO` | Ana Aluna Demo | `529.982.247-25` | curso ADS, dona das 3 solicitações |
-| `SERVIDOR` | Sergio Servidor Demo | `111.444.777-35` | secretaria |
-| `PROFESSOR` | Paula Professora Demo | `123.456.789-09` | coordenadora do curso TADS (catálogo com 4 disciplinas e ementas) |
+| Perfil | ID no auth | Observação |
+|---|---|---|
+| `ALUNO` | `11111111-1111-1111-1111-111111111111` | dona das 3 solicitações |
+| `SERVIDOR` | `22222222-2222-2222-2222-222222222222` | secretaria |
+| `PROFESSOR` | `33333333-3333-3333-3333-333333333333` | coordenadora do curso TADS (catálogo com 4 disciplinas e ementas) |
 
 | Solicitação | ID | Status |
 |---|---|---|
@@ -78,17 +78,13 @@ O login é real: abra http://localhost:8080 e entre com CPF e senha (ou crie uma
 | Banco de Dados | `aaaaaaaa-0000-0000-0000-000000000002` | `ENVIADA`, com parecer da IA |
 | Algoritmos e Lógica de Programação | `aaaaaaaa-0000-0000-0000-000000000003` | `DEFERIDA` |
 
-Exemplo via API (o token vai em `Authorization: Bearer`):
-```
-TOKEN=$(curl -s -X POST localhost:8080/auth/login -H 'Content-Type: application/json'   -d '{"cpf":"52998224725","senha":"demo1234"}' | sed 's/.*"token":"\([^"]*\)".*//')
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/aproveitamentos
-```
-
 ### Autenticação
 
-- `POST /auth/cadastro` (público): cria sempre um ALUNO. `POST /auth/login`: devolve `{token, expiraEm, usuario}`; o token (JWT HS256) vale 8 h.
-- Secretaria (perfil `SERVIDOR`): `POST /usuarios` (PROFESSOR ou SERVIDOR), `GET /usuarios?perfil=`, `PATCH /usuarios/{id}/ativo`.
-- Variáveis: `JWT_SECRET` (obrigatória no profile `render`, mínimo 32 caracteres), `ADMIN_CPF`, `ADMIN_SENHA` e `ADMIN_EMAIL` (opcional). Se `ADMIN_CPF`/`ADMIN_SENHA` estiverem definidos e não existir usuário com esse CPF, a conta "Secretaria" (SERVIDOR) é criada na inicialização, mesmo que já existam outros servidores.
+- O backend é *resource server*: valida o JWT (RS256) emitido pelo `ifsistem-auth` (assinatura e emissor, `AUTH_ISSUER`) e transforma a claim `perfil` em `ROLE_<PERFIL>`. Não há mais login, cadastro, senha nem JWT próprios aqui; a gestão de usuários é no auth (API `/usuarios` dele).
+- `public.usuarios` é só uma cópia de leitura (nomes nas telas e checagem de PROFESSOR ativo ao vincular coordenador). Na primeira requisição de um `sub` desconhecido, o registro é criado/atualizado a partir das claims (`sub`, `nome`, `cpf`, `perfil`).
+- Coordenadores: a tela lista os professores já sincronizados e permite buscar por CPF; a busca faz `GET {AUTH}/usuarios?perfil=PROFESSOR` com o token do próprio SERVIDOR e sincroniza o encontrado. Se o auth recusar, o sistema responde 502 (não há contorno).
+- Front: `js/sso.js` lê `GET /config` (`authUrl`, `clientId=aproveitamento`), carrega `{authUrl}/ifsistem-sso.js` e configura o `IfsistemSSO`. `callback.html` conclui o login; o botão Sair faz o logout no auth.
+- Exemplo via API: `curl -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8080/aproveitamentos` (o access token vem do fluxo do auth).
 
 ### Postgres (opcional)
 
@@ -105,11 +101,10 @@ Profile `render` (Postgres externo, schema via Flyway). Variáveis de ambiente:
 | Variável | Obrigatória | Descrição |
 |---|---|---|
 | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | sim | Conexão JDBC com o Postgres (ex.: `jdbc:postgresql://host:5432/postgres`). |
-| `JWT_SECRET` | sim | Segredo do JWT, mínimo 32 caracteres. Sem ele a aplicação não sobe. |
-| `ADMIN_CPF`, `ADMIN_SENHA` | recomendada | Criam a conta da secretaria (SERVIDOR) na subida, se ainda não existir usuário com esse CPF. `ADMIN_EMAIL` é opcional. |
-| `DEMO_SEED` | não | `true` popula usuários e solicitações de demonstração (senha `demo1234`). Padrão no profile `render`: `false`. |
+| `AUTH_ISSUER` | sim (tem padrão) | URL do `ifsistem-auth`; padrão `https://ifsistem-auth.onrender.com`. |
+| `DEMO_SEED` | não | `true` popula curso, catálogo e solicitações de demonstração (os usuários vêm do auth). Padrão no profile `render`: `false`. |
 
-**Desligar a demo:** deixe `DEMO_SEED` ausente ou `false` (é o padrão no `render.yaml`). O seed só roda com o profile `demo` ou `DEMO_SEED=true`. Desligar não apaga dados já semeados: se a demo já rodou em um banco de produção, remova os usuários demo (CPFs `52998224725`, `11144477735`, `12345678909`) e suas solicitações, ou troque a senha deles, pois ela é pública.
+**Desligar a demo:** deixe `DEMO_SEED` ausente ou `false` (é o padrão no `render.yaml`). Desligar não apaga dados já semeados.
 
 **Keep-alive:** `GET /health` é público e responde `200 {"status":"ok"}` sem consultar o banco; use-o em pings para evitar a hibernação do plano free.
 
@@ -123,7 +118,7 @@ Deploy no Render (Blueprint) usando o profile `render`, com Postgres externo (Su
    DB_USERNAME=postgres.<project-ref>
    DB_PASSWORD=<senha do banco>
    ```
-2. No Render, clique em **New > Blueprint**, selecione este repositório (o `render.yaml` na raiz é lido automaticamente) e preencha as variáveis do banco (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) e da conta inicial da secretaria (`ADMIN_CPF`, `ADMIN_SENHA`, opcional `ADMIN_EMAIL`). `JWT_SECRET` é gerado pelo Blueprint.
+2. No Render, clique em **New > Blueprint**, selecione este repositório (o `render.yaml` na raiz é lido automaticamente) e preencha as variáveis do banco (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`). `AUTH_ISSUER` já vem no Blueprint. As `redirectUris` do cliente `aproveitamento` precisam estar cadastradas no auth.
 3. Após o build, a aplicação responde em `https://<servico>.onrender.com` (Swagger em `/swagger-ui.html`; health check e keep-alive em `/health`). No plano free o serviço hiberna após inatividade e a primeira requisição é lenta.
 
 ## Migrações de banco (Flyway)

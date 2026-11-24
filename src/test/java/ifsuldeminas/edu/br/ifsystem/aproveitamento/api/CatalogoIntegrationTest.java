@@ -4,14 +4,16 @@ import com.jayway.jsonpath.JsonPath;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.domain.Solicitacao;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.DisciplinaCursadaRepository;
 import ifsuldeminas.edu.br.ifsystem.aproveitamento.repository.SolicitacaoRepository;
-import ifsuldeminas.edu.br.ifsystem.usuario.api.UsuarioDtos.CriarUsuario;
+import ifsuldeminas.edu.br.ifsystem.auth.AuthTestSupport;
+import ifsuldeminas.edu.br.ifsystem.auth.TestJwtDecoderConfig;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Perfil;
 import ifsuldeminas.edu.br.ifsystem.usuario.domain.Usuario;
-import ifsuldeminas.edu.br.ifsystem.usuario.service.UsuarioService;
+import ifsuldeminas.edu.br.ifsystem.usuario.repository.UsuarioRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -28,17 +30,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Catalogo de cursos/disciplinas ponta a ponta: JWT real, permissoes, banco H2 e criacao de solicitacao. */
+/** Catalogo de cursos/disciplinas ponta a ponta: token do auth (decoder de teste), permissoes, banco H2 e criacao de solicitacao. */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(TestJwtDecoderConfig.class)
 class CatalogoIntegrationTest {
-    private static final String SENHA = "senha-segura-1";
     private static final String EMENTA = "Modelagem relacional, normalizacao e linguagem SQL";
 
     @Autowired
     private MockMvc mvc;
     @Autowired
-    private UsuarioService usuarios;
+    private UsuarioRepository usuarios;
     @Autowired
     private SolicitacaoRepository solicitacoes;
     @Autowired
@@ -47,14 +49,12 @@ class CatalogoIntegrationTest {
     private record Logado(UUID id, String bearer) {
     }
 
+    /** Usuario "vindo do auth": o token basta; a primeira requisicao cria a copia local (upsert pelas claims). */
     private Logado novo(Perfil perfil) throws Exception {
-        String cpf = cpfAleatorio();
-        Usuario u = usuarios.criar(new CriarUsuario("Teste " + perfil, cpf,
-                "t" + UUID.randomUUID().toString().substring(0, 8) + "@ifsuldeminas.edu.br",
-                "M-" + UUID.randomUUID(), SENHA, null, null, null), perfil);
-        MvcResult r = mvc.perform(json(post("/auth/login"), "{\"cpf\":\"%s\",\"senha\":\"%s\"}".formatted(cpf, SENHA)))
-                .andExpect(status().isOk()).andReturn();
-        return new Logado(u.getId(), "Bearer " + JsonPath.read(r.getResponse().getContentAsString(), "$.token"));
+        UUID id = UUID.randomUUID();
+        String bearer = AuthTestSupport.bearer(id, perfil, cpfAleatorio());
+        mvc.perform(get("/cursos").header("Authorization", bearer)).andExpect(status().isOk());
+        return new Logado(id, bearer);
     }
 
     private static MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder b, String corpo) {
@@ -272,7 +272,9 @@ class CatalogoIntegrationTest {
     void professorInativoNaoPodeSerCoordenador() throws Exception {
         Logado servidor = novo(Perfil.SERVIDOR);
         Logado professor = novo(Perfil.PROFESSOR);
-        usuarios.alterarAtivo(professor.id(), false);
+        Usuario u = usuarios.findById(professor.id()).orElseThrow();
+        u.sincronizar(u.getNome(), u.getCpf(), u.getPerfil(), false);
+        usuarios.saveAndFlush(u);
         String cursoId = criarCurso(servidor, codigo());
 
         mvc.perform(json(post("/cursos/{id}/coordenadores", cursoId).header("Authorization", servidor.bearer()),
