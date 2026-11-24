@@ -66,6 +66,27 @@ class GeminiAnalisadorTest {
     }
 
     @Test
+    void acentosDaRespostaChegamIntactosEORequisicaoVaiEmUtf8() {
+        server.expect(once(), requestTo(URL))
+                .andExpect(header("Content-Type", "application/json;charset=UTF-8"))
+                .andExpect(request -> assertThat(((org.springframework.mock.http.client.MockClientHttpRequest) request)
+                        .getBodyAsString(java.nio.charset.StandardCharsets.UTF_8)).contains("coordenação acadêmica"))
+                .andRespond(withSuccess(envelope("{\\\"recomendacao\\\":\\\"SUGERE_DEFERIR\\\",\\\"similaridade\\\":80,"
+                        + "\\\"justificativa\\\":\\\"Conteúdo compatível com a disciplina.\\\"}"),
+                        MediaType.APPLICATION_JSON));
+
+        ResultadoAnalise r = analisador.analisar(ENTRADA);
+
+        assertThat(r.justificativa()).isEqualTo("Conteúdo compatível com a disciplina.");
+        assertThat(r.modelo()).isEqualTo("gemini-teste");
+    }
+
+    @Test
+    void promptPedeAcentuacaoCorreta() {
+        assertThat(GeminiAnalisador.prompt(ENTRADA)).contains("português do Brasil com acentuação correta");
+    }
+
+    @Test
     void promptTrazOsDadosDasDuasDisciplinas() {
         String prompt = GeminiAnalisador.prompt(ENTRADA);
 

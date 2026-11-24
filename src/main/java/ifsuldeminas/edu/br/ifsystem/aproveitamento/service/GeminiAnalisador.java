@@ -90,6 +90,7 @@ public class GeminiAnalisador implements AnalisadorEquivalencia {
                 Você é um assistente de coordenação acadêmica que analisa pedidos de aproveitamento de disciplinas.
                 Compare a disciplina de origem (cursada pelo aluno) com a disciplina de destino (do curso).
                 Critério: há equivalência quando a compatibilidade de conteúdo é de pelo menos 75%% e a carga horária é compatível.
+                Escreva em português do Brasil com acentuação correta.
                 Responda somente em JSON com os campos:
                 - recomendacao: SUGERE_DEFERIR (critério atendido), SUGERE_INDEFERIR (critério claramente não atendido) ou INCONCLUSIVO (dados insuficientes ou dúvida);
                 - similaridade: inteiro de 0 a 100 com a compatibilidade de conteúdo;
