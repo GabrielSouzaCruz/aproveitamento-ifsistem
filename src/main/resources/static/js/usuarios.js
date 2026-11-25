@@ -5,6 +5,7 @@
  * com o token do proprio usuario (IfsistemSSO.fetch). Sem prompt/confirm/alert. */
 
 const PERFIL_ROTULO = { ALUNO: 'Aluno', PROFESSOR: 'Professor', SERVIDOR: 'Servidor (secretaria)', ADMINISTRADOR: 'Administrador' };
+const PERFIL_CURTO = { SERVIDOR: 'Servidor' };
 const TAMANHO_PAGINA = 20;
 
 /** Estado da lista; lembrado enquanto a pagina estiver aberta. */
@@ -132,17 +133,15 @@ function validarSenha(s) {
 function linhaUsuario(u, eu) {
     return `
         <tr>
-            <td data-rotulo="Nome"><strong>${esc(u.nome)}</strong></td>
-            <td data-rotulo="CPF">${esc(mascararCpf(u.cpf))}</td>
-            <td data-rotulo="E-mail">${esc(u.email)}</td>
-            <td data-rotulo="Perfil">${esc(PERFIL_ROTULO[u.perfil] || u.perfil)}</td>
-            <td data-rotulo="Situação">${seloAtivo(u.ativo)}</td>
+            <td class="celula-nome" data-rotulo="Nome"><strong>${esc(u.nome)}</strong><span class="sub">${esc(u.email)}</span></td>
+            <td class="nowrap" data-rotulo="Perfil"><span class="valor">${esc(PERFIL_CURTO[u.perfil] || PERFIL_ROTULO[u.perfil] || u.perfil)}<span class="sub">CPF ${esc(mascararCpf(u.cpf))}</span></span></td>
+            <td class="nowrap" data-rotulo="Situação">${seloAtivo(u.ativo)}</td>
             <td class="celula-acoes"><span class="acoes-linha">
                 <button type="button" class="btn btn-sec btn-mini" data-acao="editar" data-id="${esc(u.id)}">Editar</button>
                 <button type="button" class="btn btn-sec btn-mini" data-acao="senha" data-id="${esc(u.id)}">Redefinir senha</button>
                 ${u.id === eu.id
                     ? '<span class="muted pequeno">Você</span>'
-                    : `<button type="button" class="btn btn-mini ${u.ativo ? 'btn-perigo' : 'btn-sec'}" data-acao="ativo" data-id="${esc(u.id)}">${u.ativo ? 'Inativar' : 'Ativar'}</button>`}
+                    : `<button type="button" class="btn btn-sec btn-mini" data-acao="ativo" data-id="${esc(u.id)}">${u.ativo ? 'Inativar' : 'Ativar'}</button>`}
             </span></td>
         </tr>`;
 }
@@ -162,33 +161,37 @@ async function telaUsuarios() {
     const e = estadoUsuarios;
 
     app.innerHTML = `
-        <section class="card card-tabela">
+        ${hero('Usuários', 'Cadastre professores e servidores e cuide dos acessos ao IFSISTEM.')}
+
+        <section class="card">
             <div class="card-cab">
-                <h3>Usuários <span class="contador" id="usr-contador">0</span></h3>
-                <div class="barra-filtros">
-                    <label class="busca">Buscar por nome ou CPF
-                        <input id="usr-busca" type="search" placeholder="Nome ou CPF" autocomplete="off" value="${esc(e.busca)}"></label>
-                    <label>Perfil
-                        <select id="usr-perfil">
-                            <option value="">Todos</option>
-                            ${Object.keys(PERFIL_ROTULO).map(k => `<option value="${k}"${k === e.perfil ? ' selected' : ''}>${esc(PERFIL_ROTULO[k])}</option>`).join('')}
-                        </select></label>
-                    <button type="button" class="btn" id="usr-novo">Novo usuário</button>
+                <div>
+                    <h2>Usuários <span class="contador" id="usr-contador">0</span></h2>
+                    <p class="card-sub">Alunos se cadastram sozinhos na tela de login. Aqui a secretaria cria professores e servidores.</p>
                 </div>
+                <button type="button" class="btn" id="usr-novo">Novo usuário</button>
             </div>
-            <div class="tabela-wrap">
+            <div class="filtros">
+                <label>Buscar por nome ou CPF
+                    <input id="usr-busca" type="search" placeholder="Nome ou CPF" autocomplete="off" value="${esc(e.busca)}"></label>
+                <label>Perfil
+                    <select id="usr-perfil">
+                        <option value="">Todos</option>
+                        ${Object.keys(PERFIL_ROTULO).map(k => `<option value="${k}"${k === e.perfil ? ' selected' : ''}>${esc(PERFIL_ROTULO[k])}</option>`).join('')}
+                    </select></label>
+            </div>
+            <div class="tabela-caixa"><div class="tabela-wrap">
                 <table class="responsiva">
-                    <thead><tr><th>Nome</th><th>CPF</th><th>E-mail</th><th>Perfil</th><th>Situação</th><th><span hidden>Ações</span></th></tr></thead>
+                    <thead><tr><th>Nome</th><th>Perfil</th><th>Situação</th><th><span hidden>Ações</span></th></tr></thead>
                     <tbody id="usr-linhas"></tbody>
                 </table>
-            </div>
+            </div></div>
             <nav class="paginacao" id="usr-paginacao" aria-label="Paginação" hidden>
                 <button type="button" class="btn btn-sec btn-mini" id="usr-ant">← Anterior</button>
                 <span id="usr-pagina" class="muted pequeno"></span>
                 <button type="button" class="btn btn-sec btn-mini" id="usr-prox">Próxima →</button>
             </nav>
-        </section>
-        <p class="muted pequeno">Alunos se cadastram sozinhos na tela de login. Aqui a secretaria cria professores e servidores.</p>`;
+        </section>`;
 
     let ultimo = 0; // descarta respostas antigas quando o usuario digita rapido
     async function recarregar() {
@@ -205,7 +208,7 @@ async function telaUsuarios() {
         e.resposta = r;
         document.getElementById('usr-contador').textContent = r.totalElementos;
         document.getElementById('usr-linhas').innerHTML = r.conteudo.length === 0
-            ? '<tr><td colspan="6" class="vazio">Nenhum usuário encontrado.</td></tr>'
+            ? '<tr><td colspan="4" class="vazio">Nenhum usuário encontrado.</td></tr>'
             : r.conteudo.map(u => linhaUsuario(u, eu)).join('');
         const nav = document.getElementById('usr-paginacao');
         nav.hidden = r.totalPaginas <= 1;
@@ -250,7 +253,7 @@ function novoUsuario(aplicar) {
         textoOk: 'Criar usuário',
         corpo: `
             <div class="campo"><label for="n-nome">Nome completo</label><input id="n-nome" name="nome" autocomplete="off"></div>
-            <div class="campo-linha">
+            <div class="grade-campos">
                 <div class="campo"><label for="n-cpf">CPF</label><input id="n-cpf" name="cpf" data-cpf inputmode="numeric" placeholder="000.000.000-00" autocomplete="off"></div>
                 <div class="campo"><label for="n-perfil">Perfil</label>
                     <select id="n-perfil" name="perfil">

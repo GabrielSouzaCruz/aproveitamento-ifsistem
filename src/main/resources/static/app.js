@@ -8,10 +8,10 @@ const API = '/aproveitamentos';
 
 /** Rotulos por perfil (o usuario em si vem do login). */
 const PERFIS = {
-    ALUNO: { papel: 'Aluno', area: 'Área do estudante' },
-    SERVIDOR: { papel: 'Secretaria', area: 'Área da secretaria' },
-    ADMINISTRADOR: { papel: 'Administrador', area: 'Área da secretaria' },
-    PROFESSOR: { papel: 'Coordenador', area: 'Área da coordenação' }
+    ALUNO: { papel: 'Aluno', chip: 'Aluno', area: 'Área do estudante' },
+    SERVIDOR: { papel: 'Secretaria', chip: 'Servidor', area: 'Área da secretaria' },
+    ADMINISTRADOR: { papel: 'Administrador', chip: 'Administrador', area: 'Área da secretaria' },
+    PROFESSOR: { papel: 'Coordenador', chip: 'Professor', area: 'Área da coordenação' }
 };
 
 /** Acoes por perfil e status de origem (espelha as classes de transicao do backend). */
@@ -98,7 +98,7 @@ function usuarioAtual() {
     let u = null;
     try { u = IfsistemSSO.usuario(); } catch (e) { /* token ilegivel: trata como sem sessao */ }
     if (!u) return null;
-    const p = PERFIS[u.perfil] || { papel: u.perfil, area: '' };
+    const p = PERFIS[u.perfil] || { papel: u.perfil, chip: u.perfil, area: '' };
     return Object.assign({}, u, p, { primeiroNome: (u.nome || '').split(' ')[0] });
 }
 
@@ -248,7 +248,7 @@ function montarMoldura(u, chaveRota) {
     document.body.classList.toggle('sem-sessao', !u);
     if (!u) return;
     document.getElementById('usuario-nome').textContent = u.nome;
-    document.getElementById('usuario-papel').textContent = u.papel;
+    document.getElementById('usuario-papel').textContent = u.chip;
     document.getElementById('usuario-iniciais').textContent = iniciais(u.nome);
     document.getElementById('hoje').textContent = new Date().toLocaleDateString('pt-BR',
         { day: 'numeric', month: 'long', year: 'numeric' }) + ' • ' +
@@ -266,8 +266,23 @@ function montarMoldura(u, chaveRota) {
 }
 
 function titulo(texto) {
-    document.getElementById('titulo-pagina').textContent = texto;
     document.title = texto + ' · IF Conect';
+}
+
+/** Hero verde-claro do topo de cada tela: rotulo "MES DE ANO", titulo, subtitulo de uma linha e chip do perfil. */
+function hero(tituloTela, subtitulo) {
+    const u = usuarioAtual();
+    const agora = new Date();
+    const mes = agora.toLocaleDateString('pt-BR', { month: 'long' });
+    return `
+        <header class="hero">
+            <div>
+                <p class="hero-rotulo">${esc(mes)} de ${agora.getFullYear()}</p>
+                <h1>${esc(tituloTela)}</h1>
+                <p class="hero-sub">${esc(subtitulo)}</p>
+            </div>
+            ${u ? `<span class="chip-perfil">${esc(u.chip)}</span>` : ''}
+        </header>`;
 }
 
 // ---------- Roteamento ----------
@@ -354,6 +369,12 @@ const TEXTOS_LISTA = {
     PROFESSOR: { titulo: 'Para analisar', numero: 'Solicitações dos meus cursos', cartao: 'Solicitações dos cursos que coordeno' }
 };
 
+const SUBTITULO_CARTAO = {
+    ALUNO: 'Acompanhe o andamento de cada pedido de aproveitamento.',
+    SERVIDOR: 'Confira a documentação e encaminhe cada solicitação.',
+    PROFESSOR: 'Analise e decida as solicitações dos seus cursos.'
+};
+
 /** Filtros escolhidos na fila; lembrados enquanto a pagina estiver aberta. */
 const filtrosLista = { status: FILTRO_ACAO, cursoId: '' };
 
@@ -376,18 +397,12 @@ async function telaLista() {
     const concluidas = todas.filter(s => STATUS_FINAIS.includes(s.status)).length;
     const lista = comFiltros && filtrosLista.status === FILTRO_ACAO
         ? todas.filter(s => aguardaAcao(u, s)) : todas;
-    const agora = new Date();
-    const mes = agora.toLocaleDateString('pt-BR', { month: 'long' });
+    const saudacao = aguardando === 0
+        ? 'Nenhuma solicitação aguarda ação sua agora.'
+        : `Você tem ${aguardando} ${aguardando === 1 ? 'solicitação que aguarda' : 'solicitações que aguardam'} ação sua.`;
 
     app.innerHTML = `
-        <section class="boas-vindas">
-            <p class="sobretitulo">${agora.getFullYear()} | ${esc(mes)}</p>
-            <h2>Olá, ${esc(u.primeiroNome)}!</h2>
-            <p>${aguardando === 0
-                ? 'Nenhuma solicitação aguarda ação sua agora.'
-                : `Você tem ${aguardando} ${aguardando === 1 ? 'solicitação que aguarda' : 'solicitações que aguardam'} ação sua.`}</p>
-            ${u.perfil === 'ALUNO' ? `<div class="acoes"><a class="btn" href="#/nova">${ICONES.mais} Nova solicitação</a></div>` : ''}
-        </section>
+        ${hero(txt.titulo, `Olá, ${u.primeiroNome}. ${saudacao}`)}
 
         <section class="numeros">
             <div class="numero"><span>${esc(txt.numero)}</span><strong>${todas.length}</strong></div>
@@ -395,10 +410,15 @@ async function telaLista() {
             <div class="numero realce"><span>Concluídas</span><strong>${concluidas}</strong></div>
         </section>
 
-        <section class="card card-tabela">
+        <section class="card">
             <div class="card-cab">
-                <h3>${esc(txt.cartao)} <span class="contador">${lista.length}</span></h3>
-                ${comFiltros ? `
+                <div>
+                    <h2>${esc(txt.cartao)} <span class="contador">${lista.length}</span></h2>
+                    <p class="card-sub">${esc(SUBTITULO_CARTAO[u.perfil] || SUBTITULO_CARTAO.ALUNO)}</p>
+                </div>
+                ${u.perfil === 'ALUNO' ? `<a class="btn" href="#/nova">${ICONES.mais} Nova solicitação</a>` : ''}
+            </div>
+            ${comFiltros ? `
                 <div class="filtros">
                     <label>Status
                         <select id="filtro-status">
@@ -412,12 +432,11 @@ async function telaLista() {
                             ${cursos.map(c => `<option value="${esc(c.id)}">${esc(c.nome)}</option>`).join('')}
                         </select></label>
                 </div>` : ''}
-            </div>
             <div class="tabela-wrap">
                 <table class="responsiva">
-                    <thead><tr><th>Disciplina destino</th><th>Curso</th><th>Status</th><th>Atualizada em</th><th><span hidden>Ações</span></th></tr></thead>
+                    <thead><tr><th>Disciplina destino</th><th>Status</th><th>Atualizada em</th><th><span hidden>Ações</span></th></tr></thead>
                     <tbody>
-                        ${lista.length === 0 ? '<tr><td colspan="5" class="vazio">Nenhuma solicitação encontrada.</td></tr>' : ''}
+                        ${lista.length === 0 ? '<tr><td colspan="4" class="vazio">Nenhuma solicitação encontrada.</td></tr>' : ''}
                         ${lista.map(s => linhaSolicitacao(u, s)).join('')}
                     </tbody>
                 </table>
@@ -449,14 +468,13 @@ function linhaSolicitacao(u, s) {
         ? acoes.filter(a => ['conferir', 'devolver-pendencia'].includes(a.acao)) : [];
     return `
         <tr class="clicavel" data-id="${esc(s.id)}" tabindex="0">
-            <td data-rotulo="Disciplina"><strong>${esc(s.disciplinaDestino)}</strong>
-                ${s.solicitacaoOrigemId ? '<span class="selo-nova">Nova tentativa</span>' : ''}
-                ${aguardaAcao(u, s) ? '<span class="sub">Aguarda sua ação</span>' : ''}</td>
-            <td data-rotulo="Curso">${esc(s.curso)}</td>
-            <td data-rotulo="Status">${statusBadge(s.status)}</td>
-            <td data-rotulo="Atualizada">${data(s.atualizadoEm)}</td>
+            <td class="celula-nome" data-rotulo="Disciplina"><strong>${esc(s.disciplinaDestino)}</strong>
+                <span class="sub">${esc(s.curso)}${s.solicitacaoOrigemId ? ' · Nova tentativa' : ''}</span>
+                ${aguardaAcao(u, s) ? '<span class="sub destaque-acao">Aguarda sua ação</span>' : ''}</td>
+            <td class="nowrap" data-rotulo="Status">${statusBadge(s.status)}</td>
+            <td class="nowrap" data-rotulo="Atualizada">${data(s.atualizadoEm)}</td>
             <td class="seta${rapidas.length ? ' celula-acoes' : ''}">${rapidas.length
-                ? `<span class="acoes-linha">${rapidas.map(a => `<button type="button" class="btn btn-mini ${a.perigo ? 'btn-perigo' : ''}" data-rapida="${a.acao}">${esc(a.acao === 'conferir' ? 'Conferir' : 'Devolver')}</button>`).join('')}</span>`
+                ? `<span class="acoes-linha">${rapidas.map(a => `<button type="button" class="btn btn-sec btn-mini" data-rapida="${a.acao}">${esc(a.acao === 'conferir' ? 'Conferir' : 'Devolver')}</button>`).join('')}</span>`
                 : ICONES.seta}</td>
         </tr>`;
 }
@@ -509,29 +527,29 @@ async function telaDetalhe(id) {
         podeReverificar: u.perfil === 'SERVIDOR' || (u.perfil === 'PROFESSOR' && s.podeDecidir) };
 
     app.innerHTML = `
+        ${hero('Solicitação de aproveitamento', 'Acompanhe o andamento, os documentos e o histórico desta solicitação.')}
         <a class="voltar" href="#/">${ICONES.voltar} Voltar para a lista</a>
         ${blocoOrigem(s, u)}
 
         <section class="card">
-            <div class="cabecalho-detalhe">
+            <div class="card-cab">
                 <div>
-                    <p class="sobretitulo">${esc(s.curso)} · ${esc(s.cargaHorariaDestino)} h</p>
                     <h2>${esc(s.disciplinaDestino)}</h2>
-                    <span class="muted pequeno">Atualizada em ${data(s.atualizadoEm)}</span>
+                    <p class="card-sub">${esc(s.curso)} · ${esc(s.cargaHorariaDestino)} h · Atualizada em ${data(s.atualizadoEm)}</p>
                 </div>
                 ${statusBadge(s.status)}
             </div>
-            ${podeEditar ? `<div class="acoes" style="margin-top:1rem"><a class="btn btn-sec" href="#/s/${esc(id)}/editar">Editar</a></div>` : ''}
+            ${podeEditar ? `<div class="acoes"><a class="btn btn-sec" href="#/s/${esc(id)}/editar">Editar</a></div>` : ''}
             ${blocoNovaTentativa(s, u)}
             ${acoes.length ? `
-                <div class="campo" style="margin-top:1.25rem">
+                <div class="campo secao-campo">
                     <label for="obs">Observação (opcional)</label>
                     <textarea id="obs" rows="2" maxlength="2000" placeholder="Registrada no histórico junto com a ação"></textarea>
                 </div>
                 <div class="acoes">
                     ${acoes.map(a => `<button type="button" class="btn ${a.perigo ? 'btn-perigo' : ''}" data-acao="${a.acao}">${esc(a.rotulo)}</button>`).join('')}
                 </div>`
-            : '<p class="muted" style="margin:1rem 0 0">Nenhuma ação disponível para o seu perfil neste status.</p>'}
+            : '<p class="muted secao-campo">Nenhuma ação disponível para o seu perfil neste status.</p>'}
         </section>
 
         ${veParecer ? '<section class="card destaque parecer" id="parecer"></section>' : ''}
@@ -539,7 +557,7 @@ async function telaDetalhe(id) {
 
         <div class="grade">
             <section class="card">
-                <h3>Dados da solicitação</h3>
+                <h2>Dados da solicitação</h2>
                 <dl class="dados">
                     <dt>Aluno</dt><dd>${esc(nomeUsuario(s.alunoId))}</dd>
                     <dt>Curso</dt><dd>${esc(s.curso)}</dd>
@@ -549,14 +567,14 @@ async function telaDetalhe(id) {
                 </dl>
                 ${veParecer ? '' : blocoCursadasAluno(s)}
                 ${veParecer && s.preDiagnostico ? `
-                    <h3 style="margin-top:1.5rem">Pré-diagnóstico</h3>
+                    <h3 class="secao">Pré-diagnóstico</h3>
                     <p class="pequeno">Carga: <strong>${esc(s.preDiagnostico.percentualCarga ?? '—')}%</strong>
                     · Conteúdo: <strong>${esc(s.preDiagnostico.percentualConteudo ?? '—')}%</strong></p>
                     ${s.preDiagnostico.justificativa ? `<p class="pequeno muted">${esc(s.preDiagnostico.justificativa)}</p>` : ''}` : ''}
             </section>
 
             <section class="card">
-                <h3>Histórico de status</h3>
+                <h2>Histórico de status</h2>
                 ${historico.length ? `
                     <ol class="linha-tempo">
                         ${historico.map(h => `
@@ -569,15 +587,20 @@ async function telaDetalhe(id) {
             </section>
         </div>
 
-        <section class="card" style="margin-top:1.25rem">
-            <h3>Anexos <span class="contador">${s.anexos.length}</span></h3>
+        <section class="card">
+            <div class="card-cab">
+                <div>
+                    <h2>Anexos <span class="contador">${s.anexos.length}</span></h2>
+                    <p class="card-sub">Documentos enviados e o resultado da verificação de cada um.</p>
+                </div>
+            </div>
             <div id="lista-anexos">${listaAnexos(s.anexos, ctxAnexos)}</div>
             ${podeAnexar ? `
-                <form id="form-anexo" class="acoes">
-                    <input type="file" id="arquivo" accept="application/pdf,.pdf" required aria-label="Arquivo PDF" style="flex:1;min-width:200px">
+                <form id="form-anexo">
+                    <input type="file" id="arquivo" accept="application/pdf,.pdf" required aria-label="Arquivo PDF">
                     <button type="submit" class="btn">Enviar PDF</button>
                 </form>
-                <p class="muted pequeno">Somente PDF, até 5 MB.</p>` : ''}
+                <p class="dica">Somente PDF, até 5 MB.</p>` : ''}
         </section>`;
 
     app.querySelectorAll('[data-acao]').forEach(b => b.onclick = () => executarAcao(id, b.dataset.acao, b, s));
@@ -608,8 +631,8 @@ function blocoOrigem(s, u) {
 function blocoNovaTentativa(s, u) {
     if (u.perfil !== 'ALUNO' || s.status !== 'INDEFERIDA') return '';
     if (s.novaTentativaId)
-        return `<div class="acoes" style="margin-top:1rem"><a class="btn btn-sec" href="#/s/${esc(s.novaTentativaId)}">Ver nova tentativa</a></div>`;
-    return '<div class="acoes" style="margin-top:1rem"><button type="button" class="btn" id="solicitar-novamente">Solicitar novamente</button></div>';
+        return `<div class="acoes"><a class="btn btn-sec" href="#/s/${esc(s.novaTentativaId)}">Ver nova tentativa</a></div>`;
+    return '<div class="acoes"><button type="button" class="btn" id="solicitar-novamente">Solicitar novamente</button></div>';
 }
 
 async function solicitarNovamente(id, botao) {
@@ -679,7 +702,7 @@ function listaAnexos(anexos, ctx) {
                 ${seloAnexo(a)}
                 <button type="button" class="btn btn-sec btn-mini" data-baixar="${esc(a.id)}" data-nome="${esc(a.nomeArquivo)}">Baixar</button>
                 ${ctx.podeReverificar ? `<button type="button" class="btn btn-sec btn-mini" data-reverificar="${esc(a.id)}">Reverificar</button>` : ''}
-                ${ctx.podeAnexar ? `<button type="button" class="btn btn-perigo btn-mini" data-remover="${esc(a.id)}">Remover</button>` : ''}
+                ${ctx.podeAnexar ? `<button type="button" class="btn btn-excluir btn-mini" data-remover="${esc(a.id)}">Remover</button>` : ''}
             </span>
             ${ctx.veMotivo && a.motivoVerificacao ? `<p class="anexo-motivo pequeno muted">${a.tipoDetectado ? esc(TIPO_ANEXO[a.tipoDetectado] || a.tipoDetectado) + ' · ' : ''}${esc(a.motivoVerificacao)}</p>` : ''}
             ${!ctx.veMotivo && a.statusVerificacao === 'INVALIDO' ? '<p class="anexo-motivo pequeno aviso-anexo">Revise o anexo.</p>' : ''}
@@ -798,7 +821,7 @@ async function carregarParecer(id, tentativas = 0) {
             <div class="pequeno">Similaridade de conteúdo: <strong>${sim}%</strong></div>
             <div class="barra" role="progressbar" aria-valuenow="${sim}" aria-valuemin="0" aria-valuemax="100" aria-label="Similaridade"><span style="width:${sim}%"></span></div>
             <p>${esc(p.justificativa || '')}</p>
-            <p class="muted pequeno" style="margin-bottom:0">Gerado em ${data(p.geradoEm)}. Sugestão de apoio: a decisão é do coordenador.</p>
+            <p class="muted pequeno ultimo">Gerado em ${data(p.geradoEm)}. Sugestão de apoio: a decisão é do coordenador.</p>
             ${origem ? `<p class="muted rodape-modelo">${esc(origem)}</p>` : ""}`;
     }
     card.innerHTML = cabecalhoParecer() + corpo;
@@ -817,7 +840,10 @@ async function carregarParecer(id, tentativas = 0) {
 
 function cabecalhoParecer() {
     return `<div class="card-cab">
-                <h3>${ICONES.ia} Pré-parecer da IA</h3>
+                <div>
+                    <h2>${ICONES.ia} Pré-parecer da IA</h2>
+                    <p class="card-sub">Sugestão de apoio gerada a partir das ementas.</p>
+                </div>
                 <button type="button" class="btn btn-sec btn-mini" id="btn-regerar">${ICONES.regerar} Regerar</button>
             </div>`;
 }

@@ -5,7 +5,7 @@
 /** Disciplinas cursadas (com ementa) no detalhe do aluno; o aluno nao ve parecer da IA. */
 function blocoCursadasAluno(s) {
     return `
-        <h3 style="margin-top:1.5rem">Disciplinas cursadas <span class="contador">${s.disciplinas.length}</span></h3>
+        <h3 class="secao">Disciplinas cursadas <span class="contador">${s.disciplinas.length}</span></h3>
         ${s.disciplinas.map(d => `
             <details class="cursada">
                 <summary><strong>${esc(d.nome)}</strong> · ${esc(d.instituicao)} · ${esc(d.cargaHoraria)} h</summary>
@@ -20,7 +20,7 @@ function linhaDisciplina() {
                 <div><label>Disciplina cursada<input name="nome" required maxlength="255" placeholder="Ex.: Banco de Dados I"></label></div>
                 <div><label>Instituição<input name="instituicao" required maxlength="255" placeholder="Ex.: UNIFAL"></label></div>
                 <div><label>Carga (h)<input name="cargaHoraria" type="number" min="1" required></label></div>
-                <div><button type="button" class="btn btn-perigo btn-mini remover-disc" title="Remover disciplina" aria-label="Remover disciplina">×</button></div>
+                <div><button type="button" class="btn btn-excluir btn-mini remover-disc" title="Remover disciplina" aria-label="Remover disciplina">Remover</button></div>
             </div>
             <label>Ementa da disciplina cursada
                 <textarea name="ementa" rows="4" required placeholder="Cole aqui os conteúdos programáticos da disciplina cursada"></textarea></label>
@@ -37,11 +37,17 @@ async function telaNova(editarId) {
         return navegar('#/s/' + editarId, 'Esta solicitação não pode mais ser editada.');
 
     app.innerHTML = `
+        ${hero(edicao ? 'Editar solicitação' : 'Nova solicitação', edicao
+            ? 'Revise os dados do rascunho ou da pendência e salve as alterações.'
+            : 'Escolha a disciplina de destino e informe as disciplinas que você já cursou.')}
         <a class="voltar" href="${edicao ? '#/s/' + esc(editarId) : '#/'}">${ICONES.voltar} Voltar</a>
         ${atual ? blocoOrigem(atual, usuarioAtual()) : ''}
         <form id="form-nova" class="card">
-            <h3>Disciplina que deseja aproveitar</h3>
-            <div class="campos-2">
+            <div class="card-cab"><div>
+                <h2>Disciplina que deseja aproveitar</h2>
+                <p class="card-sub">Selecione o curso e a disciplina que você quer aproveitar.</p>
+            </div></div>
+            <div class="grade-campos">
                 <div class="campo"><label for="curso">Curso</label>
                     <select id="curso" required>
                         <option value="">Selecione o curso</option>
@@ -52,23 +58,23 @@ async function telaNova(editarId) {
             </div>
             <div id="destino-info" class="ementa-destino" hidden></div>
 
-            <h3 style="margin-top:1rem">Disciplinas já cursadas</h3>
+            <h3 class="secao">Disciplinas já cursadas</h3>
             <div id="disciplinas">${linhaDisciplina()}</div>
             <button type="button" class="btn btn-sec btn-mini" id="add-disc">+ Adicionar disciplina</button>
 
-            ${edicao ? '' : `<h3 style="margin-top:1.5rem">Documento comprobatório</h3>
+            ${edicao ? '' : `<h3 class="secao">Documento comprobatório</h3>
             <div class="campo">
                 <input type="file" id="arquivo" accept="application/pdf,.pdf" aria-label="Arquivo PDF (histórico ou ementa)">
-                <p class="muted pequeno" style="margin:.3rem 0 0">Opcional agora: PDF de até 5 MB. Você também pode anexar depois, enquanto for rascunho.</p>
+                <p class="dica">Opcional agora: PDF de até 5 MB. Você também pode anexar depois, enquanto for rascunho.</p>
             </div>`}
 
-            <div class="acoes" style="margin-top:1.25rem">
+            <div class="acoes">
                 ${edicao
                     ? '<button type="submit" class="btn" data-modo="rascunho">Salvar alterações</button>'
                     : '<button type="submit" class="btn btn-sec" data-modo="rascunho">Salvar rascunho</button><button type="submit" class="btn" data-modo="enviar">Salvar e enviar</button>'}
                 <a class="btn btn-sec" href="${edicao ? '#/s/' + esc(editarId) : '#/'}">Cancelar</a>
             </div>
-            <p class="muted pequeno">O rascunho pode ser conferido, receber anexos e ser enviado a qualquer momento em "Minhas solicitações".</p>
+            <p class="dica">O rascunho pode ser conferido, receber anexos e ser enviado a qualquer momento em "Minhas solicitações".</p>
         </form>`;
 
     const form = document.getElementById('form-nova');

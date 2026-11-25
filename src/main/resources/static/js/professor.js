@@ -10,8 +10,10 @@ function blocoEmentas(s) {
     return `
         <section class="card">
             <div class="card-cab">
-                <h3>Comparação de ementas</h3>
-                <span class="muted pequeno">Carga cursada: <strong>${totalOrigem} h</strong> · Carga da disciplina destino: <strong>${esc(s.cargaHorariaDestino)} h</strong></span>
+                <div>
+                    <h2>Comparação de ementas</h2>
+                    <p class="card-sub">Carga cursada: <strong>${totalOrigem} h</strong> · Carga da disciplina destino: <strong>${esc(s.cargaHorariaDestino)} h</strong></p>
+                </div>
             </div>
             <div class="comparacao">
                 <div class="ementa-coluna">
