@@ -3,30 +3,40 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Entrando · IF Conect</title>
+    <title>IF Conect</title>
     <link rel="icon" type="image/png" href="img/favicon.png">
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="sem-sessao">
-<div class="layout">
-    <div class="principal">
-        <main class="conteudo">
-            <section class="login">
-                <img class="logo-completa" src="img/logo-ifconect.png" alt="IF Conect" width="302" height="230">
-                <p id="msg" class="muted" role="status">Entrando…</p>
-                <a id="voltar" class="btn" href="login.html" hidden>Tentar de novo</a>
-            </section>
-        </main>
-    </div>
-</div>
+<main class="conteudo">
+    <section class="login">
+        <img class="logo-completa" src="img/logo-ifconect.png" alt="IF Conect" width="302" height="230">
+        <div id="carregando" class="spinner" role="status" aria-label="Entrando"></div>
+        <p id="conectando" class="muted" hidden>Conectando ao IFSISTEM…</p>
+        <p id="msg" class="muted" role="alert" hidden></p>
+        <button type="button" id="voltar" class="btn" hidden>Tentar novamente</button>
+    </section>
+</main>
 <script src="js/sso.js"></script>
 <script>
+    const aviso = setTimeout(() => { document.getElementById('conectando').hidden = false; }, 5000);
     ssoPronto
         .then(() => IfsistemSSO.handleCallback())
         .then(() => location.replace('aproveitamento.html' + rotaPretendida()))
         .catch(e => {
-            document.getElementById('msg').textContent = e.message;
-            document.getElementById('voltar').hidden = false;
+            clearTimeout(aviso);
+            document.getElementById('carregando').hidden = true;
+            document.getElementById('conectando').hidden = true;
+            const m = document.getElementById('msg');
+            m.textContent = e.message;
+            m.hidden = false;
+            const b = document.getElementById('voltar');
+            b.hidden = false;
+            // Sem redirecionamento automatico (evita loop): so age no clique.
+            b.onclick = () => {
+                sessionStorage.removeItem(CHAVE_ROTA);
+                ssoPronto.then(() => IfsistemSSO.login()).catch(() => location.replace('/'));
+            };
         });
 </script>
 </body>

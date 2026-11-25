@@ -3,40 +3,22 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Entrar · IF Conect</title>
+    <title>IF Conect</title>
     <link rel="icon" type="image/png" href="img/favicon.png">
     <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-    <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="fonts/montserrat-latin.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="sem-sessao">
-<div class="layout">
-    <div class="principal">
-        <a class="voltar-portal" href="#" hidden>← Portal IFSISTEM</a>
-        <div id="aviso" class="aviso" role="alert" hidden></div>
-        <main class="conteudo">
-            <section class="login login-form">
-                <img class="logo-completa" src="img/logo-ifconect.png" alt="IF Conect" width="302" height="230">
-                <p class="sobretitulo">Aproveitamento de disciplinas</p>
-
-                <div class="card">
-                    <h1>Entrar</h1>
-                    <p class="muted pequeno">O acesso é pelo login único do IFSISTEM (CPF e senha).</p>
-                    <button type="button" id="btn-entrar" class="btn" disabled>Entrar com IFSISTEM</button>
-                </div>
-            </section>
-        </main>
-    </div>
-</div>
-<script src="js/portal-link.js"></script>
+<main class="conteudo">
+    <section class="login">
+        <img class="logo-completa" src="img/logo-ifconect.png" alt="IF Conect" width="302" height="230">
+        <div id="carregando" class="spinner" role="status" aria-label="Carregando"></div>
+        <p id="conectando" class="muted" hidden>Conectando ao IFSISTEM…</p>
+        <p id="erro" class="muted" role="alert" hidden></p>
+        <a id="de-novo" class="btn" href="/" hidden>Tentar novamente</a>
+    </section>
+</main>
 <script src="js/sso.js"></script>
-<script>
-    const botao = document.getElementById('btn-entrar');
-    const aviso = document.getElementById('aviso');
-    ssoPronto.then(() => { botao.disabled = false; })
-        .catch(e => { aviso.textContent = e.message; aviso.hidden = false; });
-    botao.onclick = () => { sessionStorage.removeItem(CHAVE_ROTA); IfsistemSSO.login(); };
-</script>
+<script src="js/entrada.js"></script>
 </body>
 </html>

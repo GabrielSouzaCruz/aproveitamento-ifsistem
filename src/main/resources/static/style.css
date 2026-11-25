@@ -539,3 +539,8 @@ dl.dados dd { margin-bottom: .1rem; }
     th, td { padding: .8rem 1.5rem; }
     .card:not(.card-tabela) th, .card:not(.card-tabela) td { padding: .6rem .75rem; }
 }
+
+/* Spinner da tela neutra de entrada/callback */
+.spinner { width: 36px; height: 36px; margin: 1.5rem auto; border: 4px solid #d5dbe3; border-top-color: #2f9e41; border-radius: 50%; animation: gira .9s linear infinite; }
+@keyframes gira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
