@@ -34,12 +34,21 @@ class PortalPublicoTest {
                 .andExpect(jsonPath("$.clientId").value("aproveitamento"));
     }
 
-    /** O menu da secretaria aponta para a gestao de usuarios do auth, cuja URL vem de /config (via sso.js). */
+    /** O menu da secretaria abre a tela interna #/usuarios, que chama a API do auth (URL de /config, via sso.js). */
     @Test
-    void menuDaSecretariaLigaNaGestaoDeUsuariosDoAuth() throws Exception {
+    void menuDaSecretariaAbreATelaInternaDeUsuarios() throws Exception {
         mvc.perform(get("/app.js")).andExpect(status().isOk())
-                .andExpect(content().string(containsString("/usuarios.html")))
-                .andExpect(content().string(containsString("usuarios-externo")));
+                .andExpect(content().string(containsString("href: '#/usuarios'")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("usuarios-externo"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("/usuarios.html"))));
+        mvc.perform(get("/aproveitamento.html")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("js/usuarios.js")));
+        mvc.perform(get("/js/usuarios.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("IFSISTEM_AUTH_URL")))
+                .andExpect(content().string(containsString("'/usuarios?'")))
+                .andExpect(content().string(containsString("senhaInicial")))
+                .andExpect(content().string(containsString("/ativo")))
+                .andExpect(content().string(containsString("/senha")));
         mvc.perform(get("/js/sso.js")).andExpect(status().isOk())
                 .andExpect(content().string(containsString("window.IFSISTEM_AUTH_URL = authUrl")));
     }

@@ -7,7 +7,7 @@ const ssoPronto = (async () => {
     if (!resp.ok) throw new Error('Não foi possível ler a configuração do sistema.');
     const c = await resp.json();
     const authUrl = String(c.authUrl || '').replace(/\/+$/, '');
-    window.IFSISTEM_AUTH_URL = authUrl; // o link "Usuários" do menu aponta para a gestão de usuários do auth
+    window.IFSISTEM_AUTH_URL = authUrl; // js/usuarios.js chama a API /usuarios direto neste endereço
     await new Promise((ok, falha) => {
         const s = document.createElement('script');
         s.src = authUrl + '/ifsistem-sso.js';

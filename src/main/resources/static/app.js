@@ -10,6 +10,7 @@ const API = '/aproveitamentos';
 const PERFIS = {
     ALUNO: { papel: 'Aluno', area: 'Área do estudante' },
     SERVIDOR: { papel: 'Secretaria', area: 'Área da secretaria' },
+    ADMINISTRADOR: { papel: 'Administrador', area: 'Área da secretaria' },
     PROFESSOR: { papel: 'Coordenador', area: 'Área da coordenação' }
 };
 
@@ -54,11 +55,6 @@ ICONES.livro = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stro
 ICONES.pessoas = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.5A6.5 6.5 0 0 1 21.5 20"/></svg>';
 ICONES.chave = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 7l3 3"/></svg>';
 
-/** Tela de usuarios da secretaria, servida pelo ifsistem-auth (a URL vem de GET /config, via js/sso.js). */
-function urlGestaoUsuarios() {
-    return (window.IFSISTEM_AUTH_URL || 'https://ifsistem-auth.onrender.com') + '/usuarios.html';
-}
-
 /** Menu por perfil, em secoes (mesmos titulos do menu do ifsistem-auth): `chave` casa com a chave da rota ativa (ver ROTAS). */
 const MENUS = {
     ALUNO: [
@@ -73,9 +69,14 @@ const MENUS = {
             { chave: 'cursos', href: '#/cursos', rotulo: 'Cursos e disciplinas', icone: ICONES.livro },
             { chave: 'coordenadores', href: '#/coordenadores', rotulo: 'Coordenadores', icone: ICONES.chave }
         ] },
-        // Gestao de usuarios fica no ifsistem-auth (outra aplicacao): link externo, nunca marcado como ativo.
+        // Tela interna (js/usuarios.js); os dados vem direto da API /usuarios do ifsistem-auth.
         { titulo: 'Área da secretaria', itens: [
-            { chave: 'usuarios-externo', href: urlGestaoUsuarios, rotulo: 'Usuários', icone: ICONES.pessoas }
+            { chave: 'usuarios', href: '#/usuarios', rotulo: 'Usuários', icone: ICONES.pessoas }
+        ] }
+    ],
+    ADMINISTRADOR: [
+        { titulo: 'Área da secretaria', itens: [
+            { chave: 'usuarios', href: '#/usuarios', rotulo: 'Usuários', icone: ICONES.pessoas }
         ] }
     ],
     PROFESSOR: [
@@ -280,7 +281,8 @@ const ROTAS = [
     { re: /^\/nova$/, chave: 'nova', perfis: ['ALUNO'], tela: () => telaNova() },
     { re: /^\/cursos$/, chave: 'cursos', perfis: ['SERVIDOR'], tela: () => telaCursos() },
     { re: new RegExp('^/cursos/' + UUID_RE + '$', 'i'), chave: 'cursos', perfis: ['SERVIDOR'], tela: id => telaDisciplinas(id) },
-    { re: /^\/coordenadores$/, chave: 'coordenadores', perfis: ['SERVIDOR'], tela: () => telaCoordenadores() }
+    { re: /^\/coordenadores$/, chave: 'coordenadores', perfis: ['SERVIDOR'], tela: () => telaCoordenadores() },
+    { re: /^\/usuarios$/, chave: 'usuarios', perfis: ['SERVIDOR', 'ADMINISTRADOR'], tela: () => telaUsuarios() }
 ];
 
 async function rotear() {
@@ -295,6 +297,11 @@ async function rotear() {
         if (m) { rota = r; args = m.slice(1); break; }
     }
     let avisoDaTela = null;
+    if (!rota && u.perfil === 'ADMINISTRADOR') {
+        // O administrador so tem a gestao de usuarios: a tela inicial dele e essa.
+        history.replaceState(null, '', '#/usuarios');
+        rota = ROTAS.find(r => r.chave === 'usuarios');
+    }
     if (rota && rota.perfis && !rota.perfis.includes(u.perfil)) {
         // Tela de outro perfil: mostra a tela inicial do usuario (sem novo hashchange, que apagaria o aviso).
         history.replaceState(null, '', '#/');

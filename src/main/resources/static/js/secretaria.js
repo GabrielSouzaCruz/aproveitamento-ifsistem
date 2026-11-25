@@ -1,6 +1,6 @@
 'use strict';
 
-/* Telas da secretaria (SERVIDOR): cursos e disciplinas, coordenadores. A gestao de usuarios e no ifsistem-auth. */
+/* Telas da secretaria (SERVIDOR): cursos e disciplinas, coordenadores. A gestao de usuarios fica em js/usuarios.js (API do ifsistem-auth). */
 
 function seloAtivo(ativo) {
     return `<span class="status ${ativo ? 'st-DEFERIDA' : 'st-INDEFERIDA'}">${ativo ? 'Ativo' : 'Inativo'}</span>`;
