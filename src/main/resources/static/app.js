@@ -54,6 +54,11 @@ ICONES.livro = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stro
 ICONES.pessoas = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.5A6.5 6.5 0 0 1 21.5 20"/></svg>';
 ICONES.chave = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 7l3 3"/></svg>';
 
+/** Tela de usuarios da secretaria, servida pelo ifsistem-auth (a URL vem de GET /config, via js/sso.js). */
+function urlGestaoUsuarios() {
+    return (window.IFSISTEM_AUTH_URL || 'https://ifsistem-auth.onrender.com') + '/usuarios.html';
+}
+
 /** Menu por perfil: `chave` casa com a chave da rota ativa (ver ROTAS). */
 const MENUS = {
     ALUNO: [
@@ -63,7 +68,9 @@ const MENUS = {
     SERVIDOR: [
         { chave: 'inicio', href: '#/', rotulo: 'Fila de solicitações', icone: ICONES.lista },
         { chave: 'cursos', href: '#/cursos', rotulo: 'Cursos e disciplinas', icone: ICONES.livro },
-        { chave: 'coordenadores', href: '#/coordenadores', rotulo: 'Coordenadores', icone: ICONES.chave }
+        { chave: 'coordenadores', href: '#/coordenadores', rotulo: 'Coordenadores', icone: ICONES.chave },
+        // Gestao de usuarios fica no ifsistem-auth (outra aplicacao): link externo, nunca marcado como ativo.
+        { chave: 'usuarios-externo', href: urlGestaoUsuarios, rotulo: 'Usuários', icone: ICONES.pessoas }
     ],
     PROFESSOR: [
         { chave: 'inicio', href: '#/', rotulo: 'Para analisar', icone: ICONES.lista }
@@ -242,7 +249,8 @@ function montarMoldura(u, chaveRota) {
     const itens = MENUS[u.perfil] || MENUS.ALUNO;
     document.getElementById('menu').innerHTML = itens.map(i => {
         const ativo = i.chave === chaveRota;
-        return `<a href="${i.href}" class="${ativo ? 'ativo' : ''}"${ativo ? ' aria-current="page"' : ''}>${i.icone}<span>${esc(i.rotulo)}</span></a>`;
+        const href = typeof i.href === 'function' ? i.href() : i.href;
+        return `<a href="${esc(href)}" class="${ativo ? 'ativo' : ''}"${ativo ? ' aria-current="page"' : ''}>${i.icone}<span>${esc(i.rotulo)}</span></a>`;
     }).join('');
 }
 
