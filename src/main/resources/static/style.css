@@ -559,3 +559,13 @@ dl.dados dd { margin-bottom: .1rem; }
 .paginacao { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; border-top: 1px solid var(--borda); }
 .paginacao[hidden] { display: none; }
 @media (max-width: 600px) { .barra-filtros { flex-direction: column; align-items: stretch; width: 100%; } .barra-filtros label { width: 100%; min-width: 0; } }
+
+/* ---------- Conteudo centralizado (mesmo padrao do modulo Salas/Chaves) ----------
+   Cabecalho e rodape seguem em largura total; so a area de conteudo e o aviso centralizam. */
+.conteudo, .aviso { width: 100%; max-width: 1040px; margin-left: auto; margin-right: auto; }
+.conteudo { padding-left: 16px; padding-right: 16px; }
+.aviso { width: calc(100% - 32px); margin-top: 1rem; }
+@media (min-width: 601px) {
+    .conteudo { padding-left: 24px; padding-right: 24px; }
+    .aviso { width: calc(100% - 48px); margin-top: 1.25rem; }
+}
