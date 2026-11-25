@@ -59,21 +59,29 @@ function urlGestaoUsuarios() {
     return (window.IFSISTEM_AUTH_URL || 'https://ifsistem-auth.onrender.com') + '/usuarios.html';
 }
 
-/** Menu por perfil: `chave` casa com a chave da rota ativa (ver ROTAS). */
+/** Menu por perfil, em secoes (mesmos titulos do menu do ifsistem-auth): `chave` casa com a chave da rota ativa (ver ROTAS). */
 const MENUS = {
     ALUNO: [
-        { chave: 'inicio', href: '#/', rotulo: 'Minhas solicitações', icone: ICONES.lista },
-        { chave: 'nova', href: '#/nova', rotulo: 'Nova solicitação', icone: ICONES.mais }
+        { titulo: 'Aproveitamento', itens: [
+            { chave: 'inicio', href: '#/', rotulo: 'Minhas solicitações', icone: ICONES.lista },
+            { chave: 'nova', href: '#/nova', rotulo: 'Nova solicitação', icone: ICONES.mais }
+        ] }
     ],
     SERVIDOR: [
-        { chave: 'inicio', href: '#/', rotulo: 'Fila de solicitações', icone: ICONES.lista },
-        { chave: 'cursos', href: '#/cursos', rotulo: 'Cursos e disciplinas', icone: ICONES.livro },
-        { chave: 'coordenadores', href: '#/coordenadores', rotulo: 'Coordenadores', icone: ICONES.chave },
+        { titulo: 'Aproveitamento', itens: [
+            { chave: 'inicio', href: '#/', rotulo: 'Fila de solicitações', icone: ICONES.lista },
+            { chave: 'cursos', href: '#/cursos', rotulo: 'Cursos e disciplinas', icone: ICONES.livro },
+            { chave: 'coordenadores', href: '#/coordenadores', rotulo: 'Coordenadores', icone: ICONES.chave }
+        ] },
         // Gestao de usuarios fica no ifsistem-auth (outra aplicacao): link externo, nunca marcado como ativo.
-        { chave: 'usuarios-externo', href: urlGestaoUsuarios, rotulo: 'Usuários', icone: ICONES.pessoas }
+        { titulo: 'Área da secretaria', itens: [
+            { chave: 'usuarios-externo', href: urlGestaoUsuarios, rotulo: 'Usuários', icone: ICONES.pessoas }
+        ] }
     ],
     PROFESSOR: [
-        { chave: 'inicio', href: '#/', rotulo: 'Para analisar', icone: ICONES.lista }
+        { titulo: 'Aproveitamento', itens: [
+            { chave: 'inicio', href: '#/', rotulo: 'Para analisar', icone: ICONES.lista }
+        ] }
     ]
 };
 
@@ -238,7 +246,6 @@ function erro(e) {
 function montarMoldura(u, chaveRota) {
     document.body.classList.toggle('sem-sessao', !u);
     if (!u) return;
-    document.getElementById('area-usuario').textContent = u.area;
     document.getElementById('usuario-nome').textContent = u.nome;
     document.getElementById('usuario-papel').textContent = u.papel;
     document.getElementById('usuario-iniciais').textContent = iniciais(u.nome);
@@ -246,12 +253,15 @@ function montarMoldura(u, chaveRota) {
         { day: 'numeric', month: 'long', year: 'numeric' }) + ' • ' +
         new Date().toLocaleDateString('pt-BR', { weekday: 'long' });
 
-    const itens = MENUS[u.perfil] || MENUS.ALUNO;
-    document.getElementById('menu').innerHTML = itens.map(i => {
-        const ativo = i.chave === chaveRota;
-        const href = typeof i.href === 'function' ? i.href() : i.href;
-        return `<a href="${esc(href)}" class="${ativo ? 'ativo' : ''}"${ativo ? ' aria-current="page"' : ''}>${i.icone}<span>${esc(i.rotulo)}</span></a>`;
-    }).join('');
+    const secoes = MENUS[u.perfil] || MENUS.ALUNO;
+    document.getElementById('menus').innerHTML = secoes.map(secao => `<div class="menu-secao">
+            <p class="area">${esc(secao.titulo)}</p>
+            <nav class="menu" aria-label="${esc(secao.titulo)}">${secao.itens.map(i => {
+                const ativo = i.chave === chaveRota;
+                const href = typeof i.href === 'function' ? i.href() : i.href;
+                return `<a href="${esc(href)}" class="${ativo ? 'ativo' : ''}"${ativo ? ' aria-current="page"' : ''}>${i.icone}<span>${esc(i.rotulo)}</span></a>`;
+            }).join('')}</nav>
+        </div>`).join('');
 }
 
 function titulo(texto) {
