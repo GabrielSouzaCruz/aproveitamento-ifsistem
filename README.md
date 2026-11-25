@@ -104,6 +104,8 @@ Profile `render` (Postgres externo, schema via Flyway). Variáveis de ambiente:
 | `AUTH_ISSUER` | sim (tem padrão) | URL do `ifsistem-auth`; padrão `https://ifsistem-auth.onrender.com`. |
 | `DEMO_SEED` | não | `true` popula curso, catálogo e solicitações de demonstração (os usuários vêm do auth). Padrão no profile `render`: `false`. |
 
+**Pool de conexões:** o profile `render` limita o HikariCP a 4 conexões por instância (`minimum-idle=1`, `idle-timeout=60s`, `max-lifetime=10min`). O limite de **15 conexões do Session pooler do Supabase vale para a soma de todos os serviços** (aproveitamento + ifsistem-auth, mais instâncias extras durante um deploy); mantenha a soma dos `maximum-pool-size` abaixo disso.
+
 **Desligar a demo:** deixe `DEMO_SEED` ausente ou `false` (é o padrão no `render.yaml`). Desligar não apaga dados já semeados.
 
 **Keep-alive:** `GET /health` é público e responde `200 {"status":"ok"}` sem consultar o banco; use-o em pings para evitar a hibernação do plano free.
