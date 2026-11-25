@@ -24,3 +24,20 @@ const ssoPronto = (async () => {
     });
     return c;
 })();
+
+/* Rota pretendida (hash de aproveitamento.html) sobrevive ao ciclo login -> callback.html, que perde o hash. */
+const CHAVE_ROTA = 'aproveitamento.rota';
+
+/** Guarda o hash atual (se for uma rota alem da inicial) e vai ao login do auth. */
+function entrar() {
+    if (/^#\/.+/.test(location.hash)) sessionStorage.setItem(CHAVE_ROTA, location.hash);
+    else sessionStorage.removeItem(CHAVE_ROTA);
+    return IfsistemSSO.login();
+}
+
+/** Devolve (e esquece) a rota guardada antes do login; '' se nao houver ou se nao parecer uma rota. */
+function rotaPretendida() {
+    const h = sessionStorage.getItem(CHAVE_ROTA) || '';
+    sessionStorage.removeItem(CHAVE_ROTA);
+    return /^#\/[\w\/-]*$/.test(h) ? h : '';
+}

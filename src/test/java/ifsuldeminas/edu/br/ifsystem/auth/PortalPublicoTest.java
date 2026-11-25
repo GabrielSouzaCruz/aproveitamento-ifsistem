@@ -44,6 +44,18 @@ class PortalPublicoTest {
                 .andExpect(content().string(containsString("window.IFSISTEM_AUTH_URL = authUrl")));
     }
 
+
+    /** Vindo do menu do auth (aproveitamento.html#/cursos), a rota sobrevive ao login: guardada antes e restaurada no callback. */
+    @Test
+    void rotaDoHashSobreviveAoCicloDeLogin() throws Exception {
+        mvc.perform(get("/js/sso.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("function entrar()")))
+                .andExpect(content().string(containsString("function rotaPretendida()")));
+        mvc.perform(get("/callback.html")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("'aproveitamento.html' + rotaPretendida()")));
+        mvc.perform(get("/js/inicio.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("return entrar()")));
+    }
     @Test
     void portalInternoFoiRemovido() throws Exception {
         mvc.perform(get("/portal.js")).andExpect(status().isUnauthorized());

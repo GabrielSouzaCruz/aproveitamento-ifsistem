@@ -152,11 +152,11 @@ async function http(caminho, opcoes = {}) {
     try {
         resp = await IfsistemSSO.fetch(caminho, { method: opcoes.method || 'GET', headers, body: corpo });
     } catch (e) { // sem sessao ou renovacao recusada
-        IfsistemSSO.login();
+        entrar();
         throw new ErroApi(401, mensagemAmigavel(401));
     }
     if (!resp.ok) {
-        if (resp.status === 401) { IfsistemSSO.login(); throw new ErroApi(401, mensagemAmigavel(401)); }
+        if (resp.status === 401) { entrar(); throw new ErroApi(401, mensagemAmigavel(401)); }
         const corpoErro = await resp.json().catch(() => null);
         throw new ErroApi(resp.status, mensagemAmigavel(resp.status, opcoes.ctx || (opcoes.acao ? 'acao' : undefined)), corpoErro);
     }
@@ -277,7 +277,7 @@ async function rotear() {
     clearTimeout(pollingParecer);
     clearTimeout(pollingAnexos);
     const u = usuarioAtual();
-    if (!u) { montarMoldura(null); return IfsistemSSO.login(); }
+    if (!u) { montarMoldura(null); return entrar(); }
     const hash = location.hash.replace(/^#/, '') || '/';
     let rota = null, args = [];
     for (const r of ROTAS) {

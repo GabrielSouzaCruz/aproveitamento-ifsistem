@@ -23,7 +23,7 @@
 <script>
     ssoPronto
         .then(() => IfsistemSSO.handleCallback())
-        .then(() => location.replace('aproveitamento.html'))
+        .then(() => location.replace('aproveitamento.html' + rotaPretendida()))
         .catch(e => {
             document.getElementById('msg').textContent = e.message;
             document.getElementById('voltar').hidden = false;

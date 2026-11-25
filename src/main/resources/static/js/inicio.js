@@ -4,7 +4,7 @@
  * Sem sessao no sistema, vai ao login do auth (que entra direto se a sessao de la ainda estiver ativa). */
 ssoPronto
     .then(async () => {
-        if (!(await IfsistemSSO.getToken())) return IfsistemSSO.login();
+        if (!(await IfsistemSSO.getToken())) return entrar();
         return rotear();
     })
     .catch(e => mostrarAviso(e.message || 'Falha ao iniciar a sessão.'));

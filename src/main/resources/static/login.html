@@ -36,7 +36,7 @@
     const aviso = document.getElementById('aviso');
     ssoPronto.then(() => { botao.disabled = false; })
         .catch(e => { aviso.textContent = e.message; aviso.hidden = false; });
-    botao.onclick = () => IfsistemSSO.login();
+    botao.onclick = () => { sessionStorage.removeItem(CHAVE_ROTA); IfsistemSSO.login(); };
 </script>
 </body>
 </html>
